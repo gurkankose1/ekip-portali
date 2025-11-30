@@ -106,11 +106,11 @@ const generateAndAssignSchedule = (
 
     const scheduleStartDateRef = new Date('2025-11-01T00:00:00');
     const startYear = scheduleStartDateRef.getFullYear();
-    const startMonth = scheduleStartDateRef.getMonth(); 
+    const startMonth = scheduleStartDateRef.getMonth();
 
     const generatedSchedule: DaySchedule[] = [];
-    const cycleStartDate = new Date('2025-11-01T00:00:00'); 
-    
+    const cycleStartDate = new Date('2025-11-01T00:00:00');
+
     let lastDayAssignments: { [personnel: string]: string } = {};
     const runningSummary: SummaryData = {};
     [...personnel, SPECIAL_PERSONNEL].forEach(p => {
@@ -118,10 +118,10 @@ const generateAndAssignSchedule = (
     });
 
     for (let i = 0; i < 12; i++) {
-         const currentMonthDate = new Date(startYear, startMonth + i, 1);
-         const year = currentMonthDate.getFullYear();
-         const month = currentMonthDate.getMonth();
-         const endDate = new Date(year, month + 1, 0);
+        const currentMonthDate = new Date(startYear, startMonth + i, 1);
+        const year = currentMonthDate.getFullYear();
+        const month = currentMonthDate.getMonth();
+        const endDate = new Date(year, month + 1, 0);
 
         for (let day = 1; day <= endDate.getDate(); day++) {
             const currentDate = new Date(year, month, day);
@@ -133,10 +133,10 @@ const generateAndAssignSchedule = (
 
             const dailyAssignments: Assignment[] = [];
             const currentDayAssignments: { [personnel: string]: string } = {};
-            
+
             const diffInMs = currentDate.getTime() - cycleStartDate.getTime();
             const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
-            
+
             const cycleIndex = ((diffInDays % SHIFT_CYCLE.length) + SHIFT_CYCLE.length) % SHIFT_CYCLE.length;
             let teamShift = SHIFT_CYCLE[cycleIndex];
             if (isTeamLeaveDay) {
@@ -146,14 +146,14 @@ const generateAndAssignSchedule = (
             const dayReinforcementsList = currentReinforcements.get(currentDateStr) || [];
             const allPersonnelForDay = [...personnel, SPECIAL_PERSONNEL, ...dayReinforcementsList.map(r => r.personnel)];
             const personnelOnLeaveToday = new Set<string>();
-            
+
             new Set(allPersonnelForDay).forEach(p => {
-                 if (currentLeaves.get(p)?.has(currentDateStr)) {
+                if (currentLeaves.get(p)?.has(currentDateStr)) {
                     dailyAssignments.push({ personnel: p, shift: 'Yıllık İzin' });
                     personnelOnLeaveToday.add(p);
                 }
             });
-            
+
             const stationsCoveredByReinforcements = new Set<string>();
 
             dayReinforcementsList.forEach(reinf => {
@@ -162,7 +162,7 @@ const generateAndAssignSchedule = (
                 }
                 const assignmentShift = personnelOnLeaveToday.has(reinf.personnel) ? 'Yıllık İzin' : teamShift;
                 const assignment: Assignment = { ...reinf, shift: assignmentShift };
-                
+
                 if (assignment.shift !== 'OFF' && assignment.shift !== 'Yıllık İzin' && assignment.station) {
                     stationsCoveredByReinforcements.add(assignment.station);
                     runningSummary[reinf.personnel].total++;
@@ -179,7 +179,7 @@ const generateAndAssignSchedule = (
 
             if (!isVolkanOnLeave) {
                 let volkanAssignment: Assignment;
-                 if (isVolkanWorkingToday) {
+                if (isVolkanWorkingToday) {
                     volkanAssignment = { personnel: SPECIAL_PERSONNEL, shift: 'SABAH', station: SPECIAL_PERSONNEL_STATION };
                     currentDayAssignments[SPECIAL_PERSONNEL] = SPECIAL_PERSONNEL_STATION;
                     runningSummary[SPECIAL_PERSONNEL].total++;
@@ -199,10 +199,10 @@ const generateAndAssignSchedule = (
                 } else {
                     stationsForMainTeam = STATIONS.filter(s => s !== SPECIAL_PERSONNEL_STATION);
                     if (!isVolkanWorkingToday) {
-                         stationsForMainTeam.push(SPECIAL_PERSONNEL_STATION);
+                        stationsForMainTeam.push(SPECIAL_PERSONNEL_STATION);
                     }
                 }
-                
+
                 const highPriorityStationsToday = ['Planlama', 'Frekans'];
                 if (stationsForMainTeam.includes(SPECIAL_PERSONNEL_STATION)) {
                     highPriorityStationsToday.push(SPECIAL_PERSONNEL_STATION);
@@ -212,7 +212,7 @@ const generateAndAssignSchedule = (
 
                 const priorityOrder = ['Planlama', 'Frekans', 'Su Anons', 'Board1', 'Board2', 'Board3', 'Board4'];
                 const prioritizedStationsToFill = priorityOrder.filter(s => finalStationsToFill.includes(s));
-                
+
                 let assignablePersonnel = [...workingTeam];
 
                 const totalTasks = workingTeam.reduce((sum, p) => sum + (runningSummary[p]?.total || 0), 0);
@@ -221,39 +221,27 @@ const generateAndAssignSchedule = (
 
                 for (const station of prioritizedStationsToFill) {
                     if (assignablePersonnel.length === 0) break;
-                    
+
                     let candidatePool = assignablePersonnel.filter(p => lastDayAssignments[p] !== station);
                     if (candidatePool.length === 0) {
                         candidatePool = [...assignablePersonnel];
                     }
 
-                    candidatePool.sort((a, b) => {
-                        const aIsCatchUp = personnelInCatchUp.has(a);
-                        const bIsCatchUp = personnelInCatchUp.has(b);
-                        const isStationHighPriority = highPriorityStationsToday.includes(station);
+                    // 1. Kriter: Bu istasyonda en az görev alan öne geçer (Adaletli Dağılım)
+                    const stationCountA = runningSummary[a]?.stations[station] || 0;
+                    const stationCountB = runningSummary[b]?.stations[station] || 0;
+                    if (stationCountA !== stationCountB) return stationCountA - stationCountB;
 
-                        if (aIsCatchUp !== bIsCatchUp) {
-                            if (isStationHighPriority) {
-                                return aIsCatchUp ? 1 : -1;
-                            } else {
-                                return aIsCatchUp ? -1 : 1;
-                            }
-                        }
-                        
-                        const stationCountA = runningSummary[a]?.stations[station] || 0;
-                        const stationCountB = runningSummary[b]?.stations[station] || 0;
-                        if(stationCountA !== stationCountB) return stationCountA - stationCountB;
+                    // 2. Kriter: Toplam görev sayısı en az olan öne geçer
+                    const totalDiff = (runningSummary[a]?.total || 0) - (runningSummary[b]?.total || 0);
+                    return totalDiff;
 
-                        const totalDiff = (runningSummary[a]?.total || 0) - (runningSummary[b]?.total || 0);
-                        return totalDiff;
-                    });
-                    
                     const personToAssign = candidatePool[0];
-                    
+
                     if (personToAssign) {
                         const assignment: Assignment = { personnel: personToAssign, shift: teamShift, station: station };
                         dailyAssignments.push(assignment);
-                        
+
                         currentDayAssignments[personToAssign] = station;
                         runningSummary[personToAssign].total++;
                         runningSummary[personToAssign].stations[station] = (runningSummary[personToAssign].stations[station] || 0) + 1;
@@ -261,13 +249,13 @@ const generateAndAssignSchedule = (
                         assignablePersonnel = assignablePersonnel.filter(p => p !== personToAssign);
                     }
                 }
-                 assignablePersonnel.forEach(p => dailyAssignments.push({ personnel: p, shift: teamShift }));
+                assignablePersonnel.forEach(p => dailyAssignments.push({ personnel: p, shift: teamShift }));
             } else {
                 workingTeam.forEach(person => dailyAssignments.push({ personnel: person, shift: 'OFF' }));
             }
-            
+
             lastDayAssignments = currentDayAssignments;
-           
+
             generatedSchedule.push({
                 date: currentDate,
                 assignments: dailyAssignments.sort((a, b) => a.personnel.localeCompare(b.personnel)),
@@ -285,7 +273,7 @@ const App: React.FC = () => {
     const [allUsers, setAllUsers] = useState<User[]>([]);
     const [loginError, setLoginError] = useState<string | null>(null);
     const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
-    
+
     const [publishedState, setPublishedState] = useState<ScheduleState>({
         personnel: [],
         leaves: new Map(),
@@ -299,11 +287,11 @@ const App: React.FC = () => {
         const storedTheme = localStorage.getItem('ekip-portal-theme');
         return (storedTheme as Theme) || 'dark'; // dark is default
     });
-    
+
     const [externalLinks, setExternalLinks] = useState<ExternalLink[]>([]);
     const [musicUrl, setMusicUrl] = useState<string | null>(null);
     const [isMusicPlayerVisible, setIsMusicPlayerVisible] = useState(true);
-    
+
     const [tasks, setTasks] = useState<Task[]>([]);
     const [activeUsers, setActiveUsers] = useState<string[]>([]);
     const initialLoadDone = useRef(new Set<string>());
@@ -332,7 +320,7 @@ const App: React.FC = () => {
             }
         });
     }, []);
-    
+
     useEffect(() => {
         // Listen for all users from Firebase
         const unsubscribe = onValue(usersRef, (snapshot) => {
@@ -342,14 +330,14 @@ const App: React.FC = () => {
                 ...data[key]
             }));
             loadedUsers = loadedUsers.filter(u => u.username && u.username.trim() !== 'Yeni Personel');
-            
+
             setAllUsers(loadedUsers);
-            
+
             const newSchedulePersonnel = loadedUsers
                 .filter(u => u.includeInSchedule)
                 .map(u => u.username)
                 .sort();
-            
+
             if (!areArraysEqual(newSchedulePersonnel, publishedState.personnel)) {
                 setPublishedState(prevState => {
                     const newPersonnelSet = new Set(newSchedulePersonnel);
@@ -361,7 +349,7 @@ const App: React.FC = () => {
                             newLeaves.delete(personnel);
                         }
                     }
-                     newReinforcements.forEach((assignments, date) => {
+                    newReinforcements.forEach((assignments, date) => {
                         if (Array.isArray(assignments)) {
                             const filteredAssignments = assignments.filter(a => newPersonnelSet.has(a.personnel));
                             if (filteredAssignments.length > 0) {
@@ -408,7 +396,7 @@ const App: React.FC = () => {
             }
         }
     }, [allUsers]); // Run once when allUsers are loaded
-    
+
     // --- External Links Data Fetching ---
     useEffect(() => {
         // Listen for external links
@@ -419,10 +407,10 @@ const App: React.FC = () => {
                     id: key,
                     ...data[key]
                 }));
-                 // Find and set music URL
+                // Find and set music URL
                 const musicLink = loadedLinks.find(link => link.id === 'music_player_url');
                 setMusicUrl(musicLink ? musicLink.href : null);
-                
+
                 setExternalLinks(loadedLinks.sort((a, b) => a.order - b.order));
             } else {
                 // Seed initial links if none exist in DB
@@ -436,13 +424,13 @@ const App: React.FC = () => {
                     { id: push(linksRef).key!, title: 'Flightradar', href: 'https://www.flightradar24.com/', order: 7, maskHref: true },
                     { id: push(linksRef).key!, title: 'OpsView', href: 'http://10.181.50.65/portal/?request=authentication', order: 8, maskHref: false },
                 ];
-                 const musicLink: ExternalLink = {
+                const musicLink: ExternalLink = {
                     id: 'music_player_url',
                     title: 'Music Player URL',
                     href: 'https://www.youtube.com/embed/jfKfPfyJRdk', // Default lofi stream
                     order: 999
                 };
-                
+
                 const allInitialLinks = [...initialLinks, musicLink];
 
                 const updates: { [key: string]: Omit<ExternalLink, 'id'> } = {};
@@ -475,12 +463,12 @@ const App: React.FC = () => {
     const handleLogout = () => {
         setCurrentUser(null);
         sessionStorage.removeItem('currentUserId');
-        setActiveView('portal'); 
+        setActiveView('portal');
     };
 
     const handlePasswordChange = (newPassword: string) => {
         if (!currentUser) return;
-        
+
         const userRef = ref(database, `users/${currentUser.id}`);
         update(userRef, {
             password_insecure: newPassword,
@@ -489,19 +477,19 @@ const App: React.FC = () => {
             setIsPasswordModalOpen(false);
         });
     };
-    
+
     const handleResetPassword = (userId: string) => {
-         const userRef = ref(database, `users/${userId}`);
-         update(userRef, {
+        const userRef = ref(database, `users/${userId}`);
+        update(userRef, {
             password_insecure: '12345',
             forcePasswordChange: true
-         });
+        });
     };
 
     const handleCreateUser = (newUser: Omit<User, 'id' | 'password_insecure' | 'forcePasswordChange'>) => {
         const userId = sanitizeUsernameForKey(newUser.username);
         const userRef = ref(database, `users/${userId}`);
-        
+
         get(userRef).then((snapshot) => {
             if (snapshot.exists()) {
                 alert(`"${newUser.username}" adında bir kullanıcı zaten var.`);
@@ -553,19 +541,19 @@ const App: React.FC = () => {
         root.classList.add(theme);
         localStorage.setItem('ekip-portal-theme', theme);
     }, [theme]);
-    
+
     // --- Global Presence & Task Management (Moved from ChatWidget) ---
     useEffect(() => {
         if (!currentUser) return;
 
         // Setup notification sound
         taskSoundRef.current = new Audio('data:audio/mp3;base64,SUQzBAAAAAABEVRYWFgAAAAtAAADY29tbWVudABCaWdTb3VuZEJhbmsuY29tIC8gTGliAv4uQxAAAAA021t4AAAAAE4AAACs6AAAAjIGxarmGCn8wEAc0TDE8AIAAAABn1dTEAAAAAAB4dW5nB4DAAABp5wIABkDAAABp5wIABkDAAAAAAADhhwAFwAA4TwAAgCXgDRABAADhPAACAFmADNARgAAAAAAAAB2dTYAAAANDg0ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg-LAAADSAQAGEEACAQDxAAAAAABA3AAAAAAW3///4AALm4AH/V3wfxP44e8u//AABbAAAADs/ABoAAAAAABvWAAAAAAAB9eAAAAAAAgB5v/v+AEiAgAAAAAAAAAAAAAAAAAAAAAYgCAAAAAAAAAAAAAAAAAAB2ZgAQAAADAyAAAAAAAAD2ZgAwAAAsAjIAAABmZgA4AAAAAwMiAAAAA2ZgBCgAAAMDIgAAAAxmZgA0AAAAAwMiAAAAFmZgECAAwMAyAAAHZmZgDAAAAAwMiAAAAgmZgDCAAAAMDIgAAAJmZgEIAAAAEwMiAAAAxZmYBAAAAAwMiAAABAAAAAPtmZgAAAAAAAwMiAAABAAAAANmZgEAAAAAAMAiAAABAAAAApmZgAAAAAAAwMiAAABAAAAAspmZgAAAAAAAwMiAAABAAAAA5mZgAAAAAAAwMiAAABAAAABFmZgAAAAAAAAAiAAACAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAD/LUL4HwAAENABoBAAAACwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACg==');
-        
+
         // Setup presence
         const presenceRef = ref(database, 'presence');
         const mySessionRef = push(presenceRef);
         const connectedRef = ref(database, '.info/connected');
-        
+
         const connectedUnsubscribe = onValue(connectedRef, (snapshot) => {
             if (snapshot.val() === true) {
                 set(mySessionRef, currentUser.username);
@@ -619,13 +607,13 @@ const App: React.FC = () => {
             const data = snapshot.val();
             if (data) {
                 const loadedState = deserializeState(data);
-                 if (Array.isArray(loadedState.personnel) && loadedState.leaves instanceof Map && loadedState.reinforcements instanceof Map) {
-                     setPublishedState(prevState => ({ ...prevState, ...loadedState }));
-                     setHistory(prevHistory => [{...prevHistory[0], ...loadedState}]);
-                     setHistoryIndex(0);
-                 }
+                if (Array.isArray(loadedState.personnel) && loadedState.leaves instanceof Map && loadedState.reinforcements instanceof Map) {
+                    setPublishedState(prevState => ({ ...prevState, ...loadedState }));
+                    setHistory(prevHistory => [{ ...prevHistory[0], ...loadedState }]);
+                    setHistoryIndex(0);
+                }
             } else {
-                 const initialState = {
+                const initialState = {
                     personnel: [],
                     leaves: new Map(),
                     reinforcements: new Map(),
@@ -642,7 +630,7 @@ const App: React.FC = () => {
     const [isReinforcementModalOpen, setIsReinforcementModalOpen] = useState(false);
     const [reinforcementModalDate, setReinforcementModalDate] = useState<Date | null>(null);
     const [activeView, setActiveView] = useState<ActiveView>('portal');
-    
+
     const processYearlySchedule = useMemo(() => (fullSchedule: DaySchedule[], personnel: string[]) => {
         const grouped = new Map<string, DaySchedule[]>();
         const monthFormatter = new Intl.DateTimeFormat('tr-TR', { month: 'long', year: 'numeric' });
@@ -667,7 +655,7 @@ const App: React.FC = () => {
     const userRole = currentUser?.isAdmin ? 'admin' : 'viewer';
     const adminFullSchedule = useMemo(() => draftState ? generateAndAssignSchedule(draftState) : [], [draftState]);
     const adminMonthlyData = useMemo(() => processYearlySchedule(adminFullSchedule, draftState?.personnel || []), [adminFullSchedule, draftState?.personnel]);
-    
+
     const viewerFullSchedule = useMemo(() => generateAndAssignSchedule(publishedState), [publishedState]);
     const viewerMonthlyData = useMemo(() => processYearlySchedule(viewerFullSchedule, publishedState.personnel), [viewerFullSchedule, publishedState.personnel]);
 
@@ -682,14 +670,14 @@ const App: React.FC = () => {
         const dateStr = date.toISOString().split('T')[0];
         const newLeaves: Map<string, Set<string>> = new Map(draftState.leaves);
         const personLeaves = new Set(newLeaves.get(personnel) || []);
-        
+
         if (personLeaves.has(dateStr)) {
             personLeaves.delete(dateStr);
         } else {
             personLeaves.add(dateStr);
         }
         newLeaves.set(personnel, personLeaves);
-        
+
         updateDraftState({ ...draftState, leaves: newLeaves });
     }, [draftState, historyIndex, history]);
 
@@ -711,7 +699,7 @@ const App: React.FC = () => {
 
         const updatedDayReinforcements = [...dayReinforcements, newAssignment];
         newReinforcements.set(dateStr, updatedDayReinforcements);
-        
+
         updateDraftState({ ...draftState, reinforcements: newReinforcements });
         setIsReinforcementModalOpen(false);
         setReinforcementModalDate(null);
@@ -721,15 +709,15 @@ const App: React.FC = () => {
         const dateStr = date.toISOString().split('T')[0];
         const newReinforcements: Map<string, Assignment[]> = new Map(draftState.reinforcements);
         const dayReinforcements = newReinforcements.get(dateStr) || [];
-        
+
         const updatedDayReinforcements = dayReinforcements.filter(r => r.personnel !== personnel);
-        
+
         if (updatedDayReinforcements.length > 0) {
             newReinforcements.set(dateStr, updatedDayReinforcements);
         } else {
             newReinforcements.delete(dateStr);
         }
-        
+
         updateDraftState({ ...draftState, reinforcements: newReinforcements });
     }, [draftState, history, historyIndex]);
 
@@ -740,7 +728,7 @@ const App: React.FC = () => {
 
     const handleUndo = () => historyIndex > 0 && setHistoryIndex(historyIndex - 1);
     const handleRedo = () => historyIndex < history.length - 1 && setHistoryIndex(historyIndex - 1);
-    
+
     const handleSaveChanges = () => {
         const stateToSave = {
             ...draftState,
@@ -758,14 +746,14 @@ const App: React.FC = () => {
     };
 
     const handleAssignTask = (assignee: string, description: string) => {
-        if(!currentUser) return;
+        if (!currentUser) return;
         const tasksListRef = ref(database, 'tasks');
         const newTaskRef = push(tasksListRef);
         set(newTaskRef, {
             assigner: currentUser.username, assignee, description, status: 'bekleniyor', createdAt: Date.now()
         });
     };
-    
+
     const handleAcknowledgeTask = (taskId: string) => {
         set(ref(database, `tasks/${taskId}/status`), 'onaylandı');
     };
@@ -801,16 +789,16 @@ const App: React.FC = () => {
     if (currentUser.forcePasswordChange) {
         return (
             <div className="min-h-screen bg-slate-900">
-                <ChangePasswordModal 
-                    isOpen={true} 
-                    onClose={() => {}} // Can't close
+                <ChangePasswordModal
+                    isOpen={true}
+                    onClose={() => { }} // Can't close
                     onSubmit={handlePasswordChange}
                     isFirstLogin={true}
                 />
             </div>
         );
     }
-    
+
     const handleNavigation = (view: ActiveView) => {
         setActiveView(view);
     };
@@ -849,16 +837,16 @@ const App: React.FC = () => {
                 return <PortalView setActiveView={handleNavigation} currentUser={currentUser} externalLinks={externalLinks} />;
             case 'schedule':
                 return (
-                     <div className="animate-fade-in">
+                    <div className="animate-fade-in">
                         <header className="text-center mb-8">
                             <p className="text-slate-400 mt-2 text-lg">
                                 Yıllık Görev ve İstasyon Dağılımı ({startMonthStr} - {endMonthStr})
                             </p>
                         </header>
-            
+
                         <main>
                             {userRole === 'admin' && (
-                                <AdminControls 
+                                <AdminControls
                                     onSave={handleSaveChanges}
                                     onUndo={handleUndo}
                                     onRedo={handleRedo}
@@ -900,13 +888,13 @@ const App: React.FC = () => {
                 );
             case 'spreadsheet':
                 return <SpreadsheetView currentUser={currentUser} />;
-             case 'ai_assistant':
+            case 'ai_assistant':
                 return <AiAssistantView currentUser={currentUser} />;
             case 'account':
                 return <AccountView onChangePassword={() => setIsPasswordModalOpen(true)} />;
             case 'user_management':
                 return currentUser.isAdmin ? (
-                    <UserManagementView 
+                    <UserManagementView
                         onResetPassword={handleResetPassword}
                         onCreateUser={handleCreateUser}
                         onUpdateUser={handleUpdateUser}
@@ -915,8 +903,8 @@ const App: React.FC = () => {
                     />
                 ) : null;
             case 'links':
-                 return currentUser.isAdmin ? (
-                    <LinkManagementView 
+                return currentUser.isAdmin ? (
+                    <LinkManagementView
                         links={externalLinks}
                         onCreate={handleCreateLink}
                         onUpdate={handleUpdateLink}
@@ -924,11 +912,11 @@ const App: React.FC = () => {
                     />
                 ) : null;
             case 'ai_logs':
-                 return currentUser.isAdmin ? (
+                return currentUser.isAdmin ? (
                     <AiAssistantLogView allUsers={allUsers} />
                 ) : null;
             default:
-                 return <PortalView setActiveView={handleNavigation} currentUser={currentUser} externalLinks={externalLinks} />;
+                return <PortalView setActiveView={handleNavigation} currentUser={currentUser} externalLinks={externalLinks} />;
         }
     };
 
@@ -941,8 +929,8 @@ const App: React.FC = () => {
                 }
                 .animate-fade-in { animation: fade-in 0.5s ease-out forwards; }
             `}</style>
-            <AppHeader 
-                activeView={activeView} 
+            <AppHeader
+                activeView={activeView}
                 setActiveView={handleNavigation}
                 theme={theme}
                 setTheme={setTheme}
@@ -951,22 +939,22 @@ const App: React.FC = () => {
                 isMusicPlayerVisible={isMusicPlayerVisible}
                 onToggleMusicPlayer={() => setIsMusicPlayerVisible(!isMusicPlayerVisible)}
             />
-            
+
             <main className="w-full max-w-7xl mx-auto p-4 mt-16">
                 {renderActiveView()}
             </main>
 
-             <AddReinforcementModal
+            <AddReinforcementModal
                 isOpen={isReinforcementModalOpen}
                 onClose={() => setIsReinforcementModalOpen(false)}
                 onSubmit={handleAddReinforcement}
             />
-             <ChangePasswordModal
+            <ChangePasswordModal
                 isOpen={isPasswordModalOpen}
                 onClose={() => setIsPasswordModalOpen(false)}
                 onSubmit={handlePasswordChange}
             />
-             <MusicPlayerWidget 
+            <MusicPlayerWidget
                 url={musicUrl}
                 isVisible={isMusicPlayerVisible}
             />
