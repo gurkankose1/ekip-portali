@@ -853,6 +853,28 @@ const App: React.FC = () => {
         setHistoryIndex(newHistory.length);
     };
 
+    // --- Pending Leaves Persistence ---
+    useEffect(() => {
+        if (userRole !== 'admin') return;
+
+        const pendingLeavesRef = ref(database, 'admin/pending_leaves');
+        const unsubscribe = onValue(pendingLeavesRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                // Convert object to Map<string, Set<string>>
+                const loadedPending = new Map<string, Set<string>>();
+                Object.keys(data).forEach(personnel => {
+                    const dates = data[personnel];
+                    if (Array.isArray(dates)) {
+                        loadedPending.set(personnel, new Set(dates));
+                    }
+                });
+                setPendingLeaves(loadedPending);
+            }
+        });
+        return () => unsubscribe();
+    }, [userRole]);
+
     const handleToggleLeave = useCallback((date: Date, personnel: string) => {
         const dateStr = date.toISOString().split('T')[0];
 
@@ -866,6 +888,15 @@ const App: React.FC = () => {
                 personLeaves.add(dateStr);
             }
             newLeaves.set(personnel, personLeaves);
+
+            // Save to Firebase
+            const pendingLeavesRef = ref(database, 'admin/pending_leaves');
+            const payload: { [key: string]: string[] } = {};
+            newLeaves.forEach((dates, p) => {
+                payload[p] = Array.from(dates);
+            });
+            set(pendingLeavesRef, payload);
+
             return newLeaves;
         });
 
@@ -915,6 +946,9 @@ const App: React.FC = () => {
         // En temizi: pendingLeaves'i yeni state ile güncellemek.
         setPendingLeaves(new Map(newState.leaves));
         setEarliestPendingChange(null);
+
+        // Firebase'deki pending leaves'i temizle (çünkü artık draft'a işlendi)
+        set(ref(database, 'admin/pending_leaves'), null);
 
         // Kullanıcıya geri bildirim
         alert("Çizelge başarıyla güncellendi.");
