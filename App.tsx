@@ -210,8 +210,22 @@ const generateAndAssignSchedule = (
 
                 const finalStationsToFill = stationsForMainTeam.filter(s => !stationsCoveredByReinforcements.has(s) && s !== currentDayAssignments[SPECIAL_PERSONNEL]);
 
+                // Dinamik Önceliklendirme:
+                // Sabit bir sıra (Planlama > Frekans...) yerine, ekibin o istasyondaki "toplam oturma sayısı ortalamasına" bakıyoruz.
+                // Hangi istasyonun ortalaması en düşükse (yani ekipçe en az oraya oturulmuşsa), o istasyonu doldurmaya öncelik veriyoruz.
+                // Bu sayede izinden dönen biri, eğer 'Su Anons' eksiği varsa ve o gün Su Anons'un ortalaması düşükse, direkt oraya atanır.
+
                 const priorityOrder = ['Planlama', 'Frekans', 'Su Anons', 'Board1', 'Board2', 'Board3', 'Board4'];
-                const prioritizedStationsToFill = priorityOrder.filter(s => finalStationsToFill.includes(s));
+
+                // Sadece o gün doldurulması gereken (ve Volkan'ın oturmadığı) istasyonları filtrele
+                let prioritizedStationsToFill = priorityOrder.filter(s => finalStationsToFill.includes(s));
+
+                // Bu istasyonları, "Ekip Ortalaması"na göre Küçükten Büyüğe sırala (En az oturulan en başa gelir)
+                prioritizedStationsToFill.sort((stationA, stationB) => {
+                    const avgA = workingTeam.reduce((sum, p) => sum + (runningSummary[p]?.stations[stationA] || 0), 0) / workingTeam.length;
+                    const avgB = workingTeam.reduce((sum, p) => sum + (runningSummary[p]?.stations[stationB] || 0), 0) / workingTeam.length;
+                    return avgA - avgB;
+                });
 
                 let assignablePersonnel = [...workingTeam];
 
