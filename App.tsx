@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import { database } from './firebaseConfig.ts';
 import { ref, onValue, set, get, update, remove, push, onDisconnect } from 'firebase/database';
 import { INITIAL_PERSONNEL, SHIFT_CYCLE, STATIONS, SPECIAL_PERSONNEL, SPECIAL_PERSONNEL_STATION, PUBLIC_HOLIDAYS, TEAM_LEAVE_DAYS } from './constants.ts';
@@ -19,6 +20,8 @@ import { AiAssistantLogView } from './components/AiAssistantLogView.tsx';
 import { LinkManagementView } from './components/LinkManagementView.tsx';
 import { MusicPlayerWidget } from './components/MusicPlayerWidget.tsx';
 import { SummaryView } from './components/SummaryView.tsx';
+import { PersonalDashboard } from './components/PersonalDashboard.tsx';
+import { AnnouncementBar } from './components/AnnouncementBar.tsx';
 
 
 // --- Firebase Persistence ---
@@ -852,9 +855,44 @@ const App: React.FC = () => {
     }, []);
 
     const handleGenerateSchedule = () => {
-        // Commit the pending leaves to the draft state
-        updateDraftState({ ...draftState, leaves: pendingLeaves });
+        // 1. Pending değişiklikleri draftState'e işle
+        const newLeaves = new Map(draftState.leaves);
+        pendingLeaves.forEach((dates, personnel) => {
+            const existingDates = newLeaves.get(personnel) || new Set();
+            dates.forEach(date => existingDates.add(date));
+            newLeaves.set(personnel, existingDates);
+        });
+
+        // 2. Takvimi yeniden oluştur (pending değişikliklerin en erken olduğu tarihten itibaren)
+        // Eğer pending değişiklik yoksa, bugünden itibaren oluşturur.
+        // earliestPendingChange null ise, normal akış devam eder.
+        const regenerateFrom = earliestPendingChange ? new Date(earliestPendingChange) : undefined;
+
+        generateAndAssignSchedule(newLeaves, regenerateFrom);
+
+        // 3. Pending state'i temizle
+        setPendingLeaves(new Map());
         setEarliestPendingChange(null);
+    };
+
+    const handleDownloadExcel = () => {
+        const scheduleToExport = userRole === 'admin' ? adminFullSchedule : viewerFullSchedule;
+
+        // Veriyi düzleştirip Excel için uygun formata getir
+        const data = scheduleToExport.flatMap(day =>
+            day.assignments.map(assignment => ({
+                Tarih: day.date.toLocaleDateString('tr-TR'),
+                Personel: assignment.personnel,
+                Vardiya: assignment.shift,
+                İstasyon: assignment.station || ''
+            }))
+        );
+
+        const worksheet = XLSX.utils.json_to_sheet(data);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Vardiya Çizelgesi");
+
+        XLSX.writeFile(workbook, `Vardiya_Cizelgesi_${new Date().toISOString().split('T')[0]}.xlsx`);
     };
 
     const handleDiscardPending = () => {
@@ -1123,6 +1161,12 @@ const App: React.FC = () => {
 
                             {monthlyData.size > 0 ? (
                                 <>
+                                    {currentUser && (
+                                        <PersonalDashboard
+                                            currentUser={currentUser.name}
+                                            schedule={userRole === 'admin' ? adminFullSchedule : viewerFullSchedule}
+                                        />
+                                    )}
                                     <MonthAccordion
                                         monthsData={monthlyData}
                                         userRole={userRole}
@@ -1134,8 +1178,21 @@ const App: React.FC = () => {
                                         personnel={currentPersonnelList}
                                         showHistory={showHistory}
                                     />
+
+
                                     <div className="mt-8 bg-slate-800 rounded-lg shadow-md overflow-hidden p-4">
-                                        <h2 className="text-xl font-bold text-sky-400 mb-4">Yıllık Genel Özet</h2>
+                                        <div className="flex justify-between items-center mb-4">
+                                            <h2 className="text-xl font-bold text-sky-400">Yıllık Genel Özet</h2>
+                                            <button
+                                                onClick={handleDownloadExcel}
+                                                className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-md flex items-center gap-2 transition-colors text-sm font-medium"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                    <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                                                </svg>
+                                                Excel İndir
+                                            </button>
+                                        </div>
                                         <SummaryView
                                             summary={userRole === 'admin' ? adminYearlySummary : viewerYearlySummary}
                                             monthName="Yıllık Toplam"
