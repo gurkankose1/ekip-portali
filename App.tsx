@@ -1103,120 +1103,121 @@ const App: React.FC = () => {
                             )}
 
                             {monthlyData.size > 0 ? (
-                                <MonthAccordion
-                                    monthsData={monthlyData}
-                                    userRole={userRole}
-                                    onToggleLeave={handleToggleLeave}
-                                    onAddReinforcement={openReinforcementModal}
-                                    onRemoveReinforcement={handleRemoveReinforcement}
-                                    leaves={currentLeaves}
-                                    committedLeaves={draftState.leaves}
-                                    personnel={currentPersonnelList}
-                                    showHistory={showHistory}
-                                />
-                                <div className="mt-8 bg-slate-800 rounded-lg shadow-md overflow-hidden p-4">
-                                    <h2 className="text-xl font-bold text-sky-400 mb-4">Yıllık Genel Özet</h2>
-                                    <SummaryView 
-                                        summary={userRole === 'admin' ? adminYearlySummary : viewerYearlySummary} 
-                                        monthName="Yıllık Toplam" 
-                                        personnel={currentPersonnelList} 
+                                <>
+                                    <MonthAccordion
+                                        monthsData={monthlyData}
+                                        userRole={userRole}
+                                        onToggleLeave={handleToggleLeave}
+                                        onAddReinforcement={openReinforcementModal}
+                                        onRemoveReinforcement={handleRemoveReinforcement}
+                                        leaves={currentLeaves}
+                                        committedLeaves={draftState.leaves}
+                                        personnel={currentPersonnelList}
+                                        showHistory={showHistory}
                                     />
+                                    <div className="mt-8 bg-slate-800 rounded-lg shadow-md overflow-hidden p-4">
+                                        <h2 className="text-xl font-bold text-sky-400 mb-4">Yıllık Genel Özet</h2>
+                                        <SummaryView
+                                            summary={userRole === 'admin' ? adminYearlySummary : viewerYearlySummary}
+                                            monthName="Yıllık Toplam"
+                                            personnel={currentPersonnelList}
+                                        />
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="text-center p-8 text-slate-400">
+                                    <p>Vardiya çizelgesi oluşturuluyor...</p>
                                 </div>
-                            </>
-                        ) : (
-                        <div className="text-center p-8 text-slate-400">
-                            <p>Vardiya çizelgesi oluşturuluyor...</p>
-                        </div>
                             )}
-                    </main>
+                        </main>
                     </div >
                 );
             case 'chat':
-return (
-    <ChatRoom
-        username={currentUser.username}
-        tasks={tasks}
-        activeUsers={activeUsers}
-        onAssignTask={handleAssignTask}
-        onAcknowledgeTask={handleAcknowledgeTask}
-        onRejectTask={handleRejectTask}
-    />
-);
+                return (
+                    <ChatRoom
+                        username={currentUser.username}
+                        tasks={tasks}
+                        activeUsers={activeUsers}
+                        onAssignTask={handleAssignTask}
+                        onAcknowledgeTask={handleAcknowledgeTask}
+                        onRejectTask={handleRejectTask}
+                    />
+                );
             case 'spreadsheet':
-return <SpreadsheetView currentUser={currentUser} />;
+                return <SpreadsheetView currentUser={currentUser} />;
             case 'ai_assistant':
-return <AiAssistantView currentUser={currentUser} />;
+                return <AiAssistantView currentUser={currentUser} />;
             case 'account':
-return <AccountView onChangePassword={() => setIsPasswordModalOpen(true)} />;
+                return <AccountView onChangePassword={() => setIsPasswordModalOpen(true)} />;
             case 'user_management':
-return currentUser.isAdmin ? (
-    <UserManagementView
-        onResetPassword={handleResetPassword}
-        onCreateUser={handleCreateUser}
-        onUpdateUser={handleUpdateUser}
-        onDeleteUser={handleDeleteUser}
-        allUsers={allUsers}
-    />
-) : null;
+                return currentUser.isAdmin ? (
+                    <UserManagementView
+                        onResetPassword={handleResetPassword}
+                        onCreateUser={handleCreateUser}
+                        onUpdateUser={handleUpdateUser}
+                        onDeleteUser={handleDeleteUser}
+                        allUsers={allUsers}
+                    />
+                ) : null;
             case 'links':
-return currentUser.isAdmin ? (
-    <LinkManagementView
-        links={externalLinks}
-        onCreate={handleCreateLink}
-        onUpdate={handleUpdateLink}
-        onDelete={handleDeleteLink}
-    />
-) : null;
+                return currentUser.isAdmin ? (
+                    <LinkManagementView
+                        links={externalLinks}
+                        onCreate={handleCreateLink}
+                        onUpdate={handleUpdateLink}
+                        onDelete={handleDeleteLink}
+                    />
+                ) : null;
             case 'ai_logs':
-return currentUser.isAdmin ? (
-    <AiAssistantLogView allUsers={allUsers} />
-) : null;
+                return currentUser.isAdmin ? (
+                    <AiAssistantLogView allUsers={allUsers} />
+                ) : null;
             default:
-return <PortalView setActiveView={handleNavigation} currentUser={currentUser} externalLinks={externalLinks} />;
+                return <PortalView setActiveView={handleNavigation} currentUser={currentUser} externalLinks={externalLinks} />;
         }
     };
 
-return (
-    <div className="min-h-screen bg-slate-900 text-slate-100">
-        <style>{`
+    return (
+        <div className="min-h-screen bg-slate-900 text-slate-100">
+            <style>{`
                 @keyframes fade-in {
                     from { opacity: 0; transform: translateY(-10px); }
                     to { opacity: 1; transform: translateY(0); }
                 }
                 .animate-fade-in { animation: fade-in 0.5s ease-out forwards; }
             `}</style>
-        <AppHeader
-            activeView={activeView}
-            setActiveView={handleNavigation}
-            theme={theme}
-            setTheme={setTheme}
-            currentUser={currentUser}
-            onLogout={handleLogout}
-            isMusicPlayerVisible={isMusicPlayerVisible}
-            onToggleMusicPlayer={() => setIsMusicPlayerVisible(!isMusicPlayerVisible)}
-        />
+            <AppHeader
+                activeView={activeView}
+                setActiveView={handleNavigation}
+                theme={theme}
+                setTheme={setTheme}
+                currentUser={currentUser}
+                onLogout={handleLogout}
+                isMusicPlayerVisible={isMusicPlayerVisible}
+                onToggleMusicPlayer={() => setIsMusicPlayerVisible(!isMusicPlayerVisible)}
+            />
 
-        <main className="w-full max-w-7xl mx-auto p-4 mt-16">
-            {renderActiveView()}
-        </main>
+            <main className="w-full max-w-7xl mx-auto p-4 mt-16">
+                {renderActiveView()}
+            </main>
 
-        <AddReinforcementModal
-            isOpen={isReinforcementModalOpen}
-            onClose={() => setIsReinforcementModalOpen(false)}
-            onSubmit={handleAddReinforcement}
-        />
-        <ChangePasswordModal
-            isOpen={isPasswordModalOpen}
-            onClose={() => setIsPasswordModalOpen(false)}
-            onSubmit={handlePasswordChange}
-        />
-        <MusicPlayerWidget
-            url={musicUrl}
-            isVisible={isMusicPlayerVisible}
-        />
-        {renderTaskNotifications()}
-    </div>
-);
+            <AddReinforcementModal
+                isOpen={isReinforcementModalOpen}
+                onClose={() => setIsReinforcementModalOpen(false)}
+                onSubmit={handleAddReinforcement}
+            />
+            <ChangePasswordModal
+                isOpen={isPasswordModalOpen}
+                onClose={() => setIsPasswordModalOpen(false)}
+                onSubmit={handlePasswordChange}
+            />
+            <MusicPlayerWidget
+                url={musicUrl}
+                isVisible={isMusicPlayerVisible}
+            />
+            {renderTaskNotifications()}
+        </div>
+    );
 };
 
 export default App;
