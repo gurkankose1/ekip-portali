@@ -16,9 +16,11 @@ export const PersonalDashboard: React.FC<PersonalDashboardProps> = ({ currentUse
 
     // Yerel saat dilimine göre tarih karşılaştırması
     const isSameDay = (d1: Date, d2: Date) => {
-        return d1.getFullYear() === d2.getFullYear() &&
-            d1.getMonth() === d2.getMonth() &&
-            d1.getDate() === d2.getDate();
+        const date1 = new Date(d1);
+        const date2 = new Date(d2);
+        return date1.getFullYear() === date2.getFullYear() &&
+            date1.getMonth() === date2.getMonth() &&
+            date1.getDate() === date2.getDate();
     };
 
     const todaySchedule = schedule.find(d => isSameDay(d.date, today));
@@ -29,18 +31,23 @@ export const PersonalDashboard: React.FC<PersonalDashboardProps> = ({ currentUse
 
     // Gelecek ilk izin tarihini bul
     let nextLeaveDate: Date | null = null;
-    const futureSchedule = schedule.filter(d => d.date > today);
+    const futureSchedule = schedule.filter(d => new Date(d.date) > today);
     for (const day of futureSchedule) {
         const myAssignment = day.assignments.find(a => a.personnel === currentUser);
         if (myAssignment?.shift === 'Yıllık İzin') {
-            nextLeaveDate = day.date;
+            nextLeaveDate = new Date(day.date);
             break;
         }
     }
 
     // Bu ayki istatistikler
     const currentMonth = today.getMonth();
-    const monthlyAssignments = schedule.filter(d => d.date.getMonth() === currentMonth)
+    const currentYear = today.getFullYear();
+
+    const monthlyAssignments = schedule.filter(d => {
+        const date = new Date(d.date);
+        return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+    })
         .flatMap(d => d.assignments)
         .filter(a => a.personnel === currentUser && a.station);
 

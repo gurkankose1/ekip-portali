@@ -1274,12 +1274,12 @@ const App: React.FC = () => {
     // --- Render ---
     return (
         <div className={`min-h-screen transition-colors duration-300 ${darkMode ? 'dark bg-slate-900' : 'bg-slate-50'}`}>
-            <AnnouncementBar
-                message={announcement}
-                isAdmin={userRole === 'admin'}
-                onUpdateMessage={handleUpdateAnnouncement}
-            />
             <header className="bg-white dark:bg-slate-800 shadow-sm sticky top-0 z-50 transition-colors duration-300">
+                <AnnouncementBar
+                    message={announcement}
+                    isAdmin={userRole === 'admin'}
+                    onUpdateMessage={handleUpdateAnnouncement}
+                />
                 <style>{`
                     @keyframes fade-in {
                         from { opacity: 0; transform: translateY(-10px); }
