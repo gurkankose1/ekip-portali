@@ -107,12 +107,12 @@ const generateAndAssignSchedule = (
 ): DaySchedule[] => {
     const { personnel, leaves: currentLeaves, reinforcements: currentReinforcements } = currentState;
 
-    const scheduleStartDateRef = new Date('2025-11-01T00:00:00');
+    const scheduleStartDateRef = new Date('2025-12-01T00:00:00');
     const startYear = scheduleStartDateRef.getFullYear();
     const startMonth = scheduleStartDateRef.getMonth();
 
     const generatedSchedule: DaySchedule[] = [];
-    const cycleStartDate = new Date('2025-11-01T00:00:00');
+    const cycleStartDate = new Date('2025-12-01T00:00:00');
 
     let lastDayAssignments: { [personnel: string]: string } = {};
     const runningSummary: SummaryData = {};
@@ -257,11 +257,6 @@ const generateAndAssignSchedule = (
 
                 const finalStationsToFill = stationsForMainTeam.filter(s => !stationsCoveredByReinforcements.has(s) && s !== currentDayAssignments[SPECIAL_PERSONNEL]);
 
-                // Dinamik Önceliklendirme:
-                // Sabit bir sıra (Planlama > Frekans...) yerine, ekibin o istasyondaki "toplam oturma sayısı ortalamasına" bakıyoruz.
-                // Hangi istasyonun ortalaması en düşükse (yani ekipçe en az oraya oturulmuşsa), o istasyonu doldurmaya öncelik veriyoruz.
-                // Bu sayede izinden dönen biri, eğer 'Su Anons' eksiği varsa ve o gün Su Anons'un ortalaması düşükse, direkt oraya atanır.
-
                 const priorityOrder = ['Planlama', 'Frekans', 'Su Anons', 'Board1', 'Board2', 'Board3', 'Board4'];
 
                 // Sadece o gün doldurulması gereken (ve Volkan'ın oturmadığı) istasyonları filtrele
@@ -282,21 +277,20 @@ const generateAndAssignSchedule = (
                         const isCriticalStation = ['Planlama', 'Frekans', 'Su Anons'].includes(station);
 
                         if (isCriticalStation) {
-                            // Kritik istasyonlar için: Toplam Kritik Görev Sayısı (Planlama + Frekans + Su Anons) en az olan öne geçer.
-                            const criticalCountA = (runningSummary[a]?.stations['Planlama'] || 0) + (runningSummary[a]?.stations['Frekans'] || 0) + (runningSummary[a]?.stations['Su Anons'] || 0);
-                            const criticalCountB = (runningSummary[b]?.stations['Planlama'] || 0) + (runningSummary[b]?.stations['Frekans'] || 0) + (runningSummary[b]?.stations['Su Anons'] || 0);
-
-                            if (criticalCountA !== criticalCountB) return criticalCountA - criticalCountB;
-
-                            // Eşitse, bu spesifik istasyondaki sayısı en az olan
+                            // 1. ÖNCELİK: Bu spesifik istasyondaki görev sayısı (Eşitlik İlkesi)
+                            // Eğer biri bu istasyonda diğerinden az oturmuşsa, direkt onu seç.
                             const stationCountA = runningSummary[a]?.stations[station] || 0;
                             const stationCountB = runningSummary[b]?.stations[station] || 0;
                             if (stationCountA !== stationCountB) return stationCountA - stationCountB;
+
+                            // 2. ÖNCELİK: Toplam Kritik Görev Sayısı
+                            const criticalCountA = (runningSummary[a]?.stations['Planlama'] || 0) + (runningSummary[a]?.stations['Frekans'] || 0) + (runningSummary[a]?.stations['Su Anons'] || 0);
+                            const criticalCountB = (runningSummary[b]?.stations['Planlama'] || 0) + (runningSummary[b]?.stations['Frekans'] || 0) + (runningSummary[b]?.stations['Su Anons'] || 0);
+                            if (criticalCountA !== criticalCountB) return criticalCountA - criticalCountB;
                         } else {
                             // Boardlar için: Toplam Board Görev Sayısı (B1+B2+B3+B4) en az olan öne geçer.
                             const boardCountA = (runningSummary[a]?.stations['Board1'] || 0) + (runningSummary[a]?.stations['Board2'] || 0) + (runningSummary[a]?.stations['Board3'] || 0) + (runningSummary[a]?.stations['Board4'] || 0);
                             const boardCountB = (runningSummary[b]?.stations['Board1'] || 0) + (runningSummary[b]?.stations['Board2'] || 0) + (runningSummary[b]?.stations['Board3'] || 0) + (runningSummary[b]?.stations['Board4'] || 0);
-
                             if (boardCountA !== boardCountB) return boardCountA - boardCountB;
 
                             // Eşitse, bu spesifik boarddaki sayısı en az olan
