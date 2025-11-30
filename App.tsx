@@ -265,20 +265,10 @@ const generateAndAssignSchedule = (
                 const priorityOrder = ['Planlama', 'Frekans', 'Su Anons', 'Board1', 'Board2', 'Board3', 'Board4'];
 
                 // Sadece o gün doldurulması gereken (ve Volkan'ın oturmadığı) istasyonları filtrele
+                // SIRALAMA YAPMIYORUZ! priorityOrder'a sadık kalıyoruz. Böylece personel yetersizse sondakiler (B4, B3...) boş kalır.
                 let prioritizedStationsToFill = priorityOrder.filter(s => finalStationsToFill.includes(s));
 
-                // Bu istasyonları, "Ekip Ortalaması"na göre Küçükten Büyüğe sırala (En az oturulan en başa gelir)
-                prioritizedStationsToFill.sort((stationA, stationB) => {
-                    const avgA = workingTeam.reduce((sum, p) => sum + (runningSummary[p]?.stations[stationA] || 0), 0) / workingTeam.length;
-                    const avgB = workingTeam.reduce((sum, p) => sum + (runningSummary[p]?.stations[stationB] || 0), 0) / workingTeam.length;
-                    return avgA - avgB;
-                });
-
                 let assignablePersonnel = [...workingTeam];
-
-                const totalTasks = workingTeam.reduce((sum, p) => sum + (runningSummary[p]?.total || 0), 0);
-                const avgTasks = workingTeam.length > 0 ? totalTasks / workingTeam.length : 0;
-                const personnelInCatchUp = new Set(workingTeam.filter(p => (runningSummary[p]?.total || 0) < avgTasks - 2));
 
                 for (const station of prioritizedStationsToFill) {
                     if (assignablePersonnel.length === 0) break;
@@ -289,18 +279,34 @@ const generateAndAssignSchedule = (
                     }
 
                     candidatePool.sort((a, b) => {
-                        // 1. Kriter: Toplam görev sayısı farkı çok açıksa (2 veya daha fazla), az olanı öne al (Catch-up)
-                        const totalDiff = (runningSummary[a]?.total || 0) - (runningSummary[b]?.total || 0);
-                        if (Math.abs(totalDiff) > 1) {
-                            return totalDiff;
+                        const isCriticalStation = ['Planlama', 'Frekans', 'Su Anons'].includes(station);
+
+                        if (isCriticalStation) {
+                            // Kritik istasyonlar için: Toplam Kritik Görev Sayısı (Planlama + Frekans + Su Anons) en az olan öne geçer.
+                            const criticalCountA = (runningSummary[a]?.stations['Planlama'] || 0) + (runningSummary[a]?.stations['Frekans'] || 0) + (runningSummary[a]?.stations['Su Anons'] || 0);
+                            const criticalCountB = (runningSummary[b]?.stations['Planlama'] || 0) + (runningSummary[b]?.stations['Frekans'] || 0) + (runningSummary[b]?.stations['Su Anons'] || 0);
+
+                            if (criticalCountA !== criticalCountB) return criticalCountA - criticalCountB;
+
+                            // Eşitse, bu spesifik istasyondaki sayısı en az olan
+                            const stationCountA = runningSummary[a]?.stations[station] || 0;
+                            const stationCountB = runningSummary[b]?.stations[station] || 0;
+                            if (stationCountA !== stationCountB) return stationCountA - stationCountB;
+                        } else {
+                            // Boardlar için: Toplam Board Görev Sayısı (B1+B2+B3+B4) en az olan öne geçer.
+                            const boardCountA = (runningSummary[a]?.stations['Board1'] || 0) + (runningSummary[a]?.stations['Board2'] || 0) + (runningSummary[a]?.stations['Board3'] || 0) + (runningSummary[a]?.stations['Board4'] || 0);
+                            const boardCountB = (runningSummary[b]?.stations['Board1'] || 0) + (runningSummary[b]?.stations['Board2'] || 0) + (runningSummary[b]?.stations['Board3'] || 0) + (runningSummary[b]?.stations['Board4'] || 0);
+
+                            if (boardCountA !== boardCountB) return boardCountA - boardCountB;
+
+                            // Eşitse, bu spesifik boarddaki sayısı en az olan
+                            const stationCountA = runningSummary[a]?.stations[station] || 0;
+                            const stationCountB = runningSummary[b]?.stations[station] || 0;
+                            if (stationCountA !== stationCountB) return stationCountA - stationCountB;
                         }
 
-                        // 2. Kriter: Bu istasyonda en az görev alan öne geçer (İstasyon Adaleti)
-                        const stationCountA = runningSummary[a]?.stations[station] || 0;
-                        const stationCountB = runningSummary[b]?.stations[station] || 0;
-                        if (stationCountA !== stationCountB) return stationCountA - stationCountB;
-
-                        // 3. Kriter: Eşitlik durumunda toplam görev sayısı az olan öne geçer (İnce ayar)
+                        // Son çare: Toplam görev sayısı
+                        const totalDiff = (runningSummary[a]?.total || 0) - (runningSummary[b]?.total || 0);
                         return totalDiff;
                     });
 
