@@ -823,13 +823,12 @@ const App: React.FC = () => {
 
     const adminFullSchedule = useMemo(() => {
         if (!draftState) return [];
-        // Lock date is yesterday (so today is re-generatable). 
+        // Lock date is TODAY (so regeneration starts from tomorrow).
+        // Kullanıcı isteği: "Sadece mevcut güne karışmasın."
         const today = new Date();
-        const yesterday = new Date(today);
-        yesterday.setDate(yesterday.getDate() - 1);
-        yesterday.setHours(23, 59, 59, 999);
+        today.setHours(23, 59, 59, 999);
 
-        return generateAndAssignSchedule(draftState, publishedFullSchedule, yesterday);
+        return generateAndAssignSchedule(draftState, publishedFullSchedule, today);
     }, [draftState, publishedFullSchedule]);
 
     const viewerFullSchedule = useMemo(() => {
