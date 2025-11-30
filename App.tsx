@@ -365,6 +365,7 @@ const App: React.FC = () => {
         const storedTheme = localStorage.getItem('ekip-portal-theme');
         return (storedTheme as Theme) || 'dark'; // dark is default
     });
+    const darkMode = theme === 'dark';
 
     const [externalLinks, setExternalLinks] = useState<ExternalLink[]>([]);
     const [musicUrl, setMusicUrl] = useState<string | null>(null);
@@ -703,6 +704,28 @@ const App: React.FC = () => {
     const [isReinforcementModalOpen, setIsReinforcementModalOpen] = useState(false);
     const [reinforcementModalDate, setReinforcementModalDate] = useState<Date | null>(null);
     const [showHistory, setShowHistory] = useState(false);
+    const [announcement, setAnnouncement] = useState("Hoş geldiniz! Aralık ayı vardiya çizelgesi güncellenmiştir. Lütfen kontrol ediniz.");
+
+    // Duyuruyu Firebase'den dinle
+    useEffect(() => {
+        const announcementRef = ref(database, 'settings/announcement');
+        const unsubscribe = onValue(announcementRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                setAnnouncement(data);
+            }
+        });
+        return () => unsubscribe();
+    }, []);
+
+    const handleUpdateAnnouncement = (newMessage: string) => {
+        setAnnouncement(newMessage); // Optimistic update
+        const announcementRef = ref(database, 'settings/announcement');
+        set(announcementRef, newMessage).catch(err => {
+            console.error("Duyuru güncellenemedi:", err);
+            // Hata olursa eski haline döndürme mantığı eklenebilir
+        });
+    };
     const [activeView, setActiveView] = useState<ActiveView>('portal');
 
     const processYearlySchedule = useMemo(() => (fullSchedule: DaySchedule[], personnel: string[]) => {
@@ -1244,36 +1267,39 @@ const App: React.FC = () => {
                         onDelete={handleDeleteLink}
                     />
                 ) : null;
-            case 'ai_logs':
-                return currentUser.isAdmin ? (
-                    <AiAssistantLogView allUsers={allUsers} />
-                ) : null;
-            default:
-                return <PortalView setActiveView={handleNavigation} currentUser={currentUser} externalLinks={externalLinks} />;
+
         }
     };
 
+    // --- Render ---
     return (
-        <div className="min-h-screen bg-slate-900 text-slate-100">
-            <style>{`
-                @keyframes fade-in {
-                    from { opacity: 0; transform: translateY(-10px); }
-                    to { opacity: 1; transform: translateY(0); }
-                }
-                .animate-fade-in { animation: fade-in 0.5s ease-out forwards; }
-            `}</style>
-            <AppHeader
-                activeView={activeView}
-                setActiveView={handleNavigation}
-                theme={theme}
-                setTheme={setTheme}
-                currentUser={currentUser}
-                onLogout={handleLogout}
-                isMusicPlayerVisible={isMusicPlayerVisible}
-                onToggleMusicPlayer={() => setIsMusicPlayerVisible(!isMusicPlayerVisible)}
+        <div className={`min-h-screen transition-colors duration-300 ${darkMode ? 'dark bg-slate-900' : 'bg-slate-50'}`}>
+            <AnnouncementBar
+                message={announcement}
+                isAdmin={userRole === 'admin'}
+                onUpdateMessage={handleUpdateAnnouncement}
             />
+            <header className="bg-white dark:bg-slate-800 shadow-sm sticky top-0 z-50 transition-colors duration-300">
+                <style>{`
+                    @keyframes fade-in {
+                        from { opacity: 0; transform: translateY(-10px); }
+                        to { opacity: 1; transform: translateY(0); }
+                    }
+                    .animate-fade-in { animation: fade-in 0.5s ease-out forwards; }
+                `}</style>
+                <AppHeader
+                    activeView={activeView}
+                    setActiveView={handleNavigation}
+                    theme={theme}
+                    setTheme={setTheme}
+                    currentUser={currentUser}
+                    onLogout={handleLogout}
+                    isMusicPlayerVisible={isMusicPlayerVisible}
+                    onToggleMusicPlayer={() => setIsMusicPlayerVisible(!isMusicPlayerVisible)}
+                />
+            </header>
 
-            <main className="w-full max-w-7xl mx-auto p-4 mt-16">
+            <main className="w-full max-w-7xl mx-auto p-4 mt-4">
                 {renderActiveView()}
             </main>
 

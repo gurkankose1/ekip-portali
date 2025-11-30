@@ -14,11 +14,15 @@ export const PersonalDashboard: React.FC<PersonalDashboardProps> = ({ currentUse
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const todayStr = today.toISOString().split('T')[0];
-    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+    // Yerel saat dilimine göre tarih karşılaştırması
+    const isSameDay = (d1: Date, d2: Date) => {
+        return d1.getFullYear() === d2.getFullYear() &&
+            d1.getMonth() === d2.getMonth() &&
+            d1.getDate() === d2.getDate();
+    };
 
-    const todaySchedule = schedule.find(d => d.date.toISOString().split('T')[0] === todayStr);
-    const tomorrowSchedule = schedule.find(d => d.date.toISOString().split('T')[0] === tomorrowStr);
+    const todaySchedule = schedule.find(d => isSameDay(d.date, today));
+    const tomorrowSchedule = schedule.find(d => isSameDay(d.date, tomorrow));
 
     const myToday = todaySchedule?.assignments.find(a => a.personnel === currentUser);
     const myTomorrow = tomorrowSchedule?.assignments.find(a => a.personnel === currentUser);
