@@ -386,16 +386,8 @@ const App: React.FC = () => {
         return () => unsubscribe();
     }, [currentUser?.id, publishedState.personnel]);
 
-    useEffect(() => {
-        // Restore session on component mount
-        const savedUserId = sessionStorage.getItem('currentUserId');
-        if (savedUserId && allUsers.length > 0) {
-            const user = allUsers.find(u => u.id === savedUserId);
-            if (user) {
-                setCurrentUser(user);
-            }
-        }
-    }, [allUsers]); // Run once when allUsers are loaded
+    // Session restore logic removed to force fresh login
+
 
     // --- External Links Data Fetching ---
     useEffect(() => {
