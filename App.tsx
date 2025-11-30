@@ -18,6 +18,7 @@ import AiAssistantView from './components/AiAssistantView.tsx';
 import { AiAssistantLogView } from './components/AiAssistantLogView.tsx';
 import { LinkManagementView } from './components/LinkManagementView.tsx';
 import { MusicPlayerWidget } from './components/MusicPlayerWidget.tsx';
+import { SummaryView } from './components/SummaryView.tsx';
 
 
 // --- Firebase Persistence ---
@@ -100,7 +101,9 @@ const calculateSummaryForSchedule = (schedule: DaySchedule[], personnel: string[
 
 // Bu fonksiyonu component dışında tanımlayarak yeniden render'larda tekrar oluşturulmasını engelliyoruz.
 const generateAndAssignSchedule = (
-    currentState: ScheduleState
+    currentState: ScheduleState,
+    fixedSchedule?: DaySchedule[],
+    lockDate?: Date
 ): DaySchedule[] => {
     const { personnel, leaves: currentLeaves, reinforcements: currentReinforcements } = currentState;
 
@@ -119,56 +122,6 @@ const generateAndAssignSchedule = (
         runningSummary[p] = { total: 0, stations: {} };
     });
 
-    // If regenerating from a specific date, we need to "fast forward" the state
-    // But since we don't store the full history of assignments in DB (only the result), 
-    // we actually need to re-run the logic from start BUT keep the results fixed until the date.
-    // However, to ensure consistency, the best approach is:
-    // 1. Always run from start (Nov 1st)
-    // 2. But if we are before 'regenerateFromDate', we MUST use the *existing* assignments from the previous draft if available.
-    // Wait, 'generateAndAssignSchedule' is a pure function. It doesn't know about 'previous draft'.
-    // Actually, since the algorithm is deterministic, re-running it from start with the SAME inputs (leaves) will produce the SAME result.
-    // The problem is when we CHANGE a leave in the future, we don't want the past to change.
-    // BUT, if the past hasn't changed inputs, the output won't change either!
-    // UNLESS: The algorithm has some randomness? No, it's deterministic sort.
-
-    // AH! The user wants to manually FIX the past. If the user manually changed a shift in the past (which we don't support yet, but might), 
-    // or if the user just wants to be SURE the past doesn't change even if they change a rule.
-
-    // For now, since we don't have manual overrides, re-running from start is actually SAFE 
-    // as long as the inputs for the past days haven't changed.
-    // BUT, if I change a leave on Nov 20, it might affect who sits where on Nov 21. 
-    // It should NOT affect Nov 19.
-    // And our current algorithm DOES work like that. It processes day by day.
-    // Changing inputs for day 20 will NOT affect day 19.
-
-    // SO: The user's request "Only generate after the 20th" is actually how it naturally works...
-    // EXCEPT if the user wants to "Lock" the state of the 19th even if they change the 10th?
-    // The user said: "I enter leave for the 20th. Only generate after the 20th, not after the 7th (today)".
-    // This implies if they change something on the 20th, they don't want the 21st to change? No, they want 20th+ to change.
-    // They don't want the 7th-19th to change.
-    // Since the algorithm is sequential, changing day 20 won't affect day 19.
-    // So we are good?
-
-    // WAIT. If I change a leave on day 20, the "runningSummary" (total counts) for that person changes.
-    // This MIGHT affect the sorting order on day 21. This is desired.
-    // But it definitely won't affect day 19, because day 19 is calculated BEFORE day 20.
-
-    // So, technically, simply re-running the whole function is correct and safe.
-    // The only case where "Partial Regeneration" is needed is if we had RANDOMNESS or MANUAL OVERRIDES.
-    // We have neither.
-    // So I will stick to full regeneration, which is safer and simpler.
-    // The user's fear is that changing a future date might shuffle the past. It won't.
-
-    // HOWEVER, to be 100% sure and robust (in case we add manual overrides later), 
-    // let's implement the logic to "Lock" the past if a date is provided.
-    // But we don't have the "Locked Schedule" passed in here.
-    // If regenerating from a specific date, we need to preserve the schedule BEFORE that date.
-    // Since our algorithm is deterministic and sequential (day by day), 
-    // we can simply run the generation loop as usual, BUT for days before 'regenerateFromDate',
-    // we must ensure we don't change anything if the inputs haven't changed.
-    // However, to be safe and support "Partial Regeneration" explicitly:
-    // We will check if we are before the regeneration date.
-
     for (let i = 0; i < 12; i++) {
         const currentMonthDate = new Date(startYear, startMonth + i, 1);
         const year = currentMonthDate.getFullYear();
@@ -177,23 +130,49 @@ const generateAndAssignSchedule = (
 
         for (let d = 1; d <= daysInMonth; d++) {
             const currentDate = new Date(year, month, d);
-
-            // If we are providing a regeneration date, and current date is BEFORE it,
-            // we should technically KEEP the old assignment. 
-            // But we don't have the "old assignment" passed in this function easily accessible in a way to "copy" it directly 
-            // without re-running logic or passing the full old schedule.
-            //
-            // However, the user's request is: "I change leave on 20th. Only regenerate 20th+".
-            // Since the loop runs 1..19 first, and inputs for 1..19 haven't changed, 
-            // the result for 1..19 will be IDENTICAL to before.
-            // So we don't strictly NEED to "skip" them, re-calculating them is fine and produces the same result.
-            // The important part is that changes on 20th do NOT affect 19th. And they don't (because 19 is calculated before 20).
-            //
-            // So, simply running the loop is sufficient! 
-            // The "regenerateFromDate" is more of a UI concept to tell the user "we are keeping the past safe".
-            // But in this deterministic algorithm, the past is ALWAYS safe from future changes.
-
             const currentDateStr = currentDate.toISOString().split('T')[0];
+
+            // --- LOCK LOGIC START ---
+            // If a lockDate is provided and we are on or before that date,
+            // try to use the assignment from fixedSchedule.
+            if (lockDate && currentDate <= lockDate && fixedSchedule) {
+                const fixedDay = fixedSchedule.find(day => day.date.toISOString().split('T')[0] === currentDateStr);
+                if (fixedDay) {
+                    // Update runningSummary based on fixed assignments to keep stats correct for future days
+                    fixedDay.assignments.forEach(assignment => {
+                        // Count tasks for summary
+                        if (assignment.shift !== 'OFF' && assignment.shift !== 'Yıllık İzin') {
+                            // Volkan special case: He is always SABAH but might be OFF in reality if on leave.
+                            // But here we trust the fixed assignment.
+
+                            // Check if it's a station assignment
+                            if (assignment.station) {
+                                if (!runningSummary[assignment.personnel]) {
+                                    runningSummary[assignment.personnel] = { total: 0, stations: {} };
+                                }
+                                runningSummary[assignment.personnel].total++;
+                                runningSummary[assignment.personnel].stations[assignment.station] = (runningSummary[assignment.personnel].stations[assignment.station] || 0) + 1;
+                            } else if (assignment.personnel === SPECIAL_PERSONNEL && assignment.shift === 'SABAH' && assignment.station === SPECIAL_PERSONNEL_STATION) {
+                                // Explicit check for Volkan if station prop is missing but implied (though usually it should be there)
+                                runningSummary[assignment.personnel].total++;
+                                runningSummary[assignment.personnel].stations[SPECIAL_PERSONNEL_STATION] = (runningSummary[assignment.personnel].stations[SPECIAL_PERSONNEL_STATION] || 0) + 1;
+                            }
+                        }
+                    });
+
+                    // Update lastDayAssignments for the next iteration
+                    const currentDayAssignments: { [personnel: string]: string } = {};
+                    fixedDay.assignments.forEach(a => {
+                        if (a.station) currentDayAssignments[a.personnel] = a.station;
+                    });
+                    lastDayAssignments = currentDayAssignments;
+
+                    generatedSchedule.push(fixedDay);
+                    continue; // Skip normal generation for this day
+                }
+            }
+            // --- LOCK LOGIC END ---
+
             const dayOfWeek = currentDate.getDay();
             const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
             const isHoliday = PUBLIC_HOLIDAYS.includes(currentDateStr);
@@ -732,21 +711,90 @@ const App: React.FC = () => {
             grouped.get(key)!.push(day);
         }
 
-        const finalData = new Map<string, { schedule: DaySchedule[], summary: SummaryData }>();
-        for (const [key, schedule] of grouped.entries()) {
-            const summary = calculateSummaryForSchedule(schedule, personnel);
-            finalData.set(key, { schedule, summary });
-        }
+        const result = new Map<string, { schedule: DaySchedule[], summary: SummaryData }>();
 
-        return finalData;
+        // Calculate summary for the WHOLE year first
+        const yearlySummary: SummaryData = {};
+        [...personnel, SPECIAL_PERSONNEL].forEach(p => {
+            yearlySummary[p] = { total: 0, stations: {} };
+        });
+
+        fullSchedule.forEach(day => {
+            day.assignments.forEach(assignment => {
+                if (assignment.shift !== 'OFF' && assignment.shift !== 'Yıllık İzin' && assignment.station) {
+                    if (!yearlySummary[assignment.personnel]) yearlySummary[assignment.personnel] = { total: 0, stations: {} };
+                    yearlySummary[assignment.personnel].total++;
+                    yearlySummary[assignment.personnel].stations[assignment.station] = (yearlySummary[assignment.personnel].stations[assignment.station] || 0) + 1;
+                } else if (assignment.personnel === SPECIAL_PERSONNEL && assignment.shift === 'SABAH' && assignment.station === SPECIAL_PERSONNEL_STATION) {
+                    if (!yearlySummary[assignment.personnel]) yearlySummary[assignment.personnel] = { total: 0, stations: {} };
+                    yearlySummary[assignment.personnel].total++;
+                    yearlySummary[assignment.personnel].stations[SPECIAL_PERSONNEL_STATION] = (yearlySummary[assignment.personnel].stations[SPECIAL_PERSONNEL_STATION] || 0) + 1;
+                }
+            });
+        });
+
+        grouped.forEach((days, key) => {
+            // Calculate monthly summary
+            const summary: SummaryData = {};
+            [...personnel, SPECIAL_PERSONNEL].forEach(p => {
+                summary[p] = { total: 0, stations: {} };
+            });
+
+            days.forEach(day => {
+                day.assignments.forEach(assignment => {
+                    if (assignment.shift !== 'OFF' && assignment.shift !== 'Yıllık İzin' && assignment.station) {
+                        summary[assignment.personnel].total++;
+                        summary[assignment.personnel].stations[assignment.station] = (summary[assignment.personnel].stations[assignment.station] || 0) + 1;
+                    } else if (assignment.personnel === SPECIAL_PERSONNEL && assignment.shift === 'SABAH' && assignment.station === SPECIAL_PERSONNEL_STATION) {
+                        summary[assignment.personnel].total++;
+                        summary[assignment.personnel].stations[SPECIAL_PERSONNEL_STATION] = (summary[assignment.personnel].stations[SPECIAL_PERSONNEL_STATION] || 0) + 1;
+                    }
+                });
+            });
+
+            result.set(key, { schedule: days, summary });
+        });
+
+        return { monthlyData: result, yearlySummary };
     }, []);
 
     const userRole = currentUser?.isAdmin ? 'admin' : 'viewer';
-    const adminFullSchedule = useMemo(() => draftState ? generateAndAssignSchedule(draftState) : [], [draftState]);
-    const adminMonthlyData = useMemo(() => processYearlySchedule(adminFullSchedule, draftState?.personnel || []), [adminFullSchedule, draftState?.personnel]);
 
-    const viewerFullSchedule = useMemo(() => generateAndAssignSchedule(publishedState), [publishedState]);
-    const viewerMonthlyData = useMemo(() => processYearlySchedule(viewerFullSchedule, publishedState.personnel), [viewerFullSchedule, publishedState.personnel]);
+    // Lock Logic:
+    // We need a "Base Schedule" that represents the "Truth of the Past".
+    // This is derived from 'publishedState' (what is currently in DB).
+    // We want to lock everything BEFORE today.
+
+    const publishedFullSchedule = useMemo(() => {
+        if (!publishedState) return [];
+        return generateAndAssignSchedule(publishedState);
+    }, [publishedState]);
+
+    const adminFullSchedule = useMemo(() => {
+        if (!draftState) return [];
+        // Lock date is yesterday (so today is re-generatable). 
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        yesterday.setHours(23, 59, 59, 999);
+
+        return generateAndAssignSchedule(draftState, publishedFullSchedule, yesterday);
+    }, [draftState, publishedFullSchedule]);
+
+    const viewerFullSchedule = useMemo(() => {
+        if (!publishedState) return [];
+        return generateAndAssignSchedule(publishedState);
+    }, [publishedState]);
+
+    const { monthlyData: adminMonthlyData, yearlySummary: adminYearlySummary } = useMemo(() => {
+        if (!draftState) return { monthlyData: new Map(), yearlySummary: {} };
+        return processYearlySchedule(adminFullSchedule, draftState.personnel);
+    }, [adminFullSchedule, draftState?.personnel, processYearlySchedule]);
+
+    const { monthlyData: viewerMonthlyData, yearlySummary: viewerYearlySummary } = useMemo(() => {
+        if (!publishedState) return { monthlyData: new Map(), yearlySummary: {} };
+        return processYearlySchedule(viewerFullSchedule, publishedState.personnel);
+    }, [viewerFullSchedule, publishedState?.personnel, processYearlySchedule]);
 
 
     const updateDraftState = (newState: ScheduleState) => {
@@ -1060,100 +1108,109 @@ const App: React.FC = () => {
                                     personnel={currentPersonnelList}
                                     showHistory={showHistory}
                                 />
-                            ) : (
-                                <div className="text-center p-8 text-slate-400">
-                                    <p>Vardiya çizelgesi oluşturuluyor...</p>
+                                <div className="mt-8 bg-slate-800 rounded-lg shadow-md overflow-hidden p-4">
+                                    <h2 className="text-xl font-bold text-sky-400 mb-4">Yıllık Genel Özet</h2>
+                                    <SummaryView 
+                                        summary={userRole === 'admin' ? adminYearlySummary : viewerYearlySummary} 
+                                        monthName="Yıllık Toplam" 
+                                        personnel={currentPersonnelList} 
+                                    />
                                 </div>
+                            </>
+                        ) : (
+                        <div className="text-center p-8 text-slate-400">
+                            <p>Vardiya çizelgesi oluşturuluyor...</p>
+                        </div>
                             )}
-                        </main>
-                    </div>
+                    </main>
+                    </div >
                 );
             case 'chat':
-                return (
-                    <ChatRoom
-                        username={currentUser.username}
-                        tasks={tasks}
-                        activeUsers={activeUsers}
-                        onAssignTask={handleAssignTask}
-                        onAcknowledgeTask={handleAcknowledgeTask}
-                        onRejectTask={handleRejectTask}
-                    />
-                );
+return (
+    <ChatRoom
+        username={currentUser.username}
+        tasks={tasks}
+        activeUsers={activeUsers}
+        onAssignTask={handleAssignTask}
+        onAcknowledgeTask={handleAcknowledgeTask}
+        onRejectTask={handleRejectTask}
+    />
+);
             case 'spreadsheet':
-                return <SpreadsheetView currentUser={currentUser} />;
+return <SpreadsheetView currentUser={currentUser} />;
             case 'ai_assistant':
-                return <AiAssistantView currentUser={currentUser} />;
+return <AiAssistantView currentUser={currentUser} />;
             case 'account':
-                return <AccountView onChangePassword={() => setIsPasswordModalOpen(true)} />;
+return <AccountView onChangePassword={() => setIsPasswordModalOpen(true)} />;
             case 'user_management':
-                return currentUser.isAdmin ? (
-                    <UserManagementView
-                        onResetPassword={handleResetPassword}
-                        onCreateUser={handleCreateUser}
-                        onUpdateUser={handleUpdateUser}
-                        onDeleteUser={handleDeleteUser}
-                        allUsers={allUsers}
-                    />
-                ) : null;
+return currentUser.isAdmin ? (
+    <UserManagementView
+        onResetPassword={handleResetPassword}
+        onCreateUser={handleCreateUser}
+        onUpdateUser={handleUpdateUser}
+        onDeleteUser={handleDeleteUser}
+        allUsers={allUsers}
+    />
+) : null;
             case 'links':
-                return currentUser.isAdmin ? (
-                    <LinkManagementView
-                        links={externalLinks}
-                        onCreate={handleCreateLink}
-                        onUpdate={handleUpdateLink}
-                        onDelete={handleDeleteLink}
-                    />
-                ) : null;
+return currentUser.isAdmin ? (
+    <LinkManagementView
+        links={externalLinks}
+        onCreate={handleCreateLink}
+        onUpdate={handleUpdateLink}
+        onDelete={handleDeleteLink}
+    />
+) : null;
             case 'ai_logs':
-                return currentUser.isAdmin ? (
-                    <AiAssistantLogView allUsers={allUsers} />
-                ) : null;
+return currentUser.isAdmin ? (
+    <AiAssistantLogView allUsers={allUsers} />
+) : null;
             default:
-                return <PortalView setActiveView={handleNavigation} currentUser={currentUser} externalLinks={externalLinks} />;
+return <PortalView setActiveView={handleNavigation} currentUser={currentUser} externalLinks={externalLinks} />;
         }
     };
 
-    return (
-        <div className="min-h-screen bg-slate-900 text-slate-100">
-            <style>{`
+return (
+    <div className="min-h-screen bg-slate-900 text-slate-100">
+        <style>{`
                 @keyframes fade-in {
                     from { opacity: 0; transform: translateY(-10px); }
                     to { opacity: 1; transform: translateY(0); }
                 }
                 .animate-fade-in { animation: fade-in 0.5s ease-out forwards; }
             `}</style>
-            <AppHeader
-                activeView={activeView}
-                setActiveView={handleNavigation}
-                theme={theme}
-                setTheme={setTheme}
-                currentUser={currentUser}
-                onLogout={handleLogout}
-                isMusicPlayerVisible={isMusicPlayerVisible}
-                onToggleMusicPlayer={() => setIsMusicPlayerVisible(!isMusicPlayerVisible)}
-            />
+        <AppHeader
+            activeView={activeView}
+            setActiveView={handleNavigation}
+            theme={theme}
+            setTheme={setTheme}
+            currentUser={currentUser}
+            onLogout={handleLogout}
+            isMusicPlayerVisible={isMusicPlayerVisible}
+            onToggleMusicPlayer={() => setIsMusicPlayerVisible(!isMusicPlayerVisible)}
+        />
 
-            <main className="w-full max-w-7xl mx-auto p-4 mt-16">
-                {renderActiveView()}
-            </main>
+        <main className="w-full max-w-7xl mx-auto p-4 mt-16">
+            {renderActiveView()}
+        </main>
 
-            <AddReinforcementModal
-                isOpen={isReinforcementModalOpen}
-                onClose={() => setIsReinforcementModalOpen(false)}
-                onSubmit={handleAddReinforcement}
-            />
-            <ChangePasswordModal
-                isOpen={isPasswordModalOpen}
-                onClose={() => setIsPasswordModalOpen(false)}
-                onSubmit={handlePasswordChange}
-            />
-            <MusicPlayerWidget
-                url={musicUrl}
-                isVisible={isMusicPlayerVisible}
-            />
-            {renderTaskNotifications()}
-        </div>
-    );
+        <AddReinforcementModal
+            isOpen={isReinforcementModalOpen}
+            onClose={() => setIsReinforcementModalOpen(false)}
+            onSubmit={handleAddReinforcement}
+        />
+        <ChangePasswordModal
+            isOpen={isPasswordModalOpen}
+            onClose={() => setIsPasswordModalOpen(false)}
+            onSubmit={handlePasswordChange}
+        />
+        <MusicPlayerWidget
+            url={musicUrl}
+            isVisible={isMusicPlayerVisible}
+        />
+        {renderTaskNotifications()}
+    </div>
+);
 };
 
 export default App;
