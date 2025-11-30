@@ -879,23 +879,46 @@ const App: React.FC = () => {
 
     const handleGenerateSchedule = () => {
         // 1. Pending değişiklikleri draftState'e işle
+        // Not: pendingLeaves zaten UI'da gösteriliyor, şimdi bunları kalıcı olarak draftState'e aktarıyoruz.
         const newLeaves = new Map(draftState.leaves);
-        pendingLeaves.forEach((dates, personnel) => {
-            const existingDates = newLeaves.get(personnel) || new Set();
-            dates.forEach(date => existingDates.add(date));
-            newLeaves.set(personnel, existingDates);
-        });
 
-        // 2. Takvimi yeniden oluştur (pending değişikliklerin en erken olduğu tarihten itibaren)
-        // Eğer pending değişiklik yoksa, bugünden itibaren oluşturur.
-        // earliestPendingChange null ise, normal akış devam eder.
-        const regenerateFrom = earliestPendingChange ? new Date(earliestPendingChange) : undefined;
+        // pendingLeaves içindeki değişiklikleri newLeaves'e aktar
+        // pendingLeaves, o anki düzenleme oturumundaki tüm değişiklikleri tutar
+        // Ancak burada mantık hatası yapmamak için:
+        // pendingLeaves sadece "değişenleri" tutuyor. 
+        // Aslında pendingLeaves'i direkt draftState.leaves olarak kabul edebiliriz çünkü
+        // handleToggleLeave fonksiyonunda pendingLeaves, draftState baz alınarak güncelleniyor.
 
-        generateAndAssignSchedule(newLeaves, regenerateFrom);
+        // Ancak pendingLeaves'in yapısı Map<string, Set<string>>.
+        // draftState.leaves de aynı yapıda.
 
-        // 3. Pending state'i temizle
-        setPendingLeaves(new Map());
+        // Basitçe pendingLeaves'i draftState'e kaydetmemiz yeterli, çünkü handleToggleLeave
+        // her seferinde tüm state'i kopyalayıp güncelliyor (veya öyle olmalı).
+
+
+        // handleToggleLeave'e bakarsak:
+        // setPendingLeaves(prevPending => { ... }) yapıyor.
+        // İlk başta pendingLeaves, draftState.leaves ile senkronize ediliyor (useEffect satır 685).
+        // Yani pendingLeaves güncel halidir.
+
+        const newState: ScheduleState = {
+            ...draftState,
+            leaves: new Map(pendingLeaves) // Pending leaves artık "gerçek" leaves oluyor
+        };
+
+        // 2. State'i güncelle (Bu tetikleme useMemo'yu çalıştıracak ve takvim yeniden hesaplanacak)
+        updateDraftState(newState);
+
+        // 3. Pending state'i temizle (veya senkronize tut)
+        // Artık pending değişiklik kalmadı, hepsi draft oldu.
+        // Ancak UI'ın tutarlılığı için pendingLeaves'i yeni state ile aynı tutabiliriz.
+        // Veya boşaltıp, bir sonraki değişiklikte tekrar doldurabiliriz.
+        // En temizi: pendingLeaves'i yeni state ile güncellemek.
+        setPendingLeaves(new Map(newState.leaves));
         setEarliestPendingChange(null);
+
+        // Kullanıcıya geri bildirim
+        alert("Çizelge başarıyla güncellendi.");
     };
 
     const handleDownloadExcel = () => {
