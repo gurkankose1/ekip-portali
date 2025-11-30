@@ -727,14 +727,24 @@ const App: React.FC = () => {
 
         fullSchedule.forEach(day => {
             day.assignments.forEach(assignment => {
+                if (!assignment || !assignment.personnel) return;
+
                 if (assignment.shift !== 'OFF' && assignment.shift !== 'Yıllık İzin' && assignment.station) {
                     if (!yearlySummary[assignment.personnel]) yearlySummary[assignment.personnel] = { total: 0, stations: {} };
-                    yearlySummary[assignment.personnel].total++;
-                    yearlySummary[assignment.personnel].stations[assignment.station] = (yearlySummary[assignment.personnel].stations[assignment.station] || 0) + 1;
+
+                    const personSummary = yearlySummary[assignment.personnel];
+                    if (personSummary) {
+                        personSummary.total++;
+                        personSummary.stations[assignment.station] = (personSummary.stations[assignment.station] || 0) + 1;
+                    }
                 } else if (assignment.personnel === SPECIAL_PERSONNEL && assignment.shift === 'SABAH' && assignment.station === SPECIAL_PERSONNEL_STATION) {
                     if (!yearlySummary[assignment.personnel]) yearlySummary[assignment.personnel] = { total: 0, stations: {} };
-                    yearlySummary[assignment.personnel].total++;
-                    yearlySummary[assignment.personnel].stations[SPECIAL_PERSONNEL_STATION] = (yearlySummary[assignment.personnel].stations[SPECIAL_PERSONNEL_STATION] || 0) + 1;
+
+                    const personSummary = yearlySummary[assignment.personnel];
+                    if (personSummary) {
+                        personSummary.total++;
+                        personSummary.stations[SPECIAL_PERSONNEL_STATION] = (personSummary.stations[SPECIAL_PERSONNEL_STATION] || 0) + 1;
+                    }
                 }
             });
         });
@@ -748,12 +758,24 @@ const App: React.FC = () => {
 
             days.forEach(day => {
                 day.assignments.forEach(assignment => {
+                    if (!assignment || !assignment.personnel) return;
+
                     if (assignment.shift !== 'OFF' && assignment.shift !== 'Yıllık İzin' && assignment.station) {
-                        summary[assignment.personnel].total++;
-                        summary[assignment.personnel].stations[assignment.station] = (summary[assignment.personnel].stations[assignment.station] || 0) + 1;
+                        if (!summary[assignment.personnel]) summary[assignment.personnel] = { total: 0, stations: {} };
+
+                        const personSummary = summary[assignment.personnel];
+                        if (personSummary) {
+                            personSummary.total++;
+                            personSummary.stations[assignment.station] = (personSummary.stations[assignment.station] || 0) + 1;
+                        }
                     } else if (assignment.personnel === SPECIAL_PERSONNEL && assignment.shift === 'SABAH' && assignment.station === SPECIAL_PERSONNEL_STATION) {
-                        summary[assignment.personnel].total++;
-                        summary[assignment.personnel].stations[SPECIAL_PERSONNEL_STATION] = (summary[assignment.personnel].stations[SPECIAL_PERSONNEL_STATION] || 0) + 1;
+                        if (!summary[assignment.personnel]) summary[assignment.personnel] = { total: 0, stations: {} };
+
+                        const personSummary = summary[assignment.personnel];
+                        if (personSummary) {
+                            personSummary.total++;
+                            personSummary.stations[SPECIAL_PERSONNEL_STATION] = (personSummary.stations[SPECIAL_PERSONNEL_STATION] || 0) + 1;
+                        }
                     }
                 });
             });
