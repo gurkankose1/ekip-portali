@@ -1274,30 +1274,32 @@ const App: React.FC = () => {
     // --- Render ---
     return (
         <div className={`min-h-screen transition-colors duration-300 ${darkMode ? 'dark bg-slate-900' : 'bg-slate-50'}`}>
-            <header className="bg-white dark:bg-slate-800 shadow-sm sticky top-0 z-50 transition-colors duration-300">
+            <div className="sticky top-0 z-50">
                 <AnnouncementBar
                     message={announcement}
                     isAdmin={userRole === 'admin'}
                     onUpdateMessage={handleUpdateAnnouncement}
                 />
-                <style>{`
-                    @keyframes fade-in {
-                        from { opacity: 0; transform: translateY(-10px); }
-                        to { opacity: 1; transform: translateY(0); }
-                    }
-                    .animate-fade-in { animation: fade-in 0.5s ease-out forwards; }
-                `}</style>
-                <AppHeader
-                    activeView={activeView}
-                    setActiveView={handleNavigation}
-                    theme={theme}
-                    setTheme={setTheme}
-                    currentUser={currentUser}
-                    onLogout={handleLogout}
-                    isMusicPlayerVisible={isMusicPlayerVisible}
-                    onToggleMusicPlayer={() => setIsMusicPlayerVisible(!isMusicPlayerVisible)}
-                />
-            </header>
+                <header className="bg-white dark:bg-slate-800 shadow-sm transition-colors duration-300">
+                    <style>{`
+                        @keyframes fade-in {
+                            from { opacity: 0; transform: translateY(-10px); }
+                            to { opacity: 1; transform: translateY(0); }
+                        }
+                        .animate-fade-in { animation: fade-in 0.5s ease-out forwards; }
+                    `}</style>
+                    <AppHeader
+                        activeView={activeView}
+                        setActiveView={handleNavigation}
+                        theme={theme}
+                        setTheme={setTheme}
+                        currentUser={currentUser}
+                        onLogout={handleLogout}
+                        isMusicPlayerVisible={isMusicPlayerVisible}
+                        onToggleMusicPlayer={() => setIsMusicPlayerVisible(!isMusicPlayerVisible)}
+                    />
+                </header>
+            </div>
 
             <main className="w-full max-w-7xl mx-auto p-4 mt-4">
                 {renderActiveView()}
