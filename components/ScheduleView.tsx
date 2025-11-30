@@ -128,17 +128,37 @@ const DayCard: React.FC<{
     );
 }
 
-export const ScheduleView: React.FC<ScheduleViewProps> = ({ schedule, userRole, onToggleLeave, onAddReinforcement, onRemoveReinforcement, leaves, committedLeaves }) => {
-    if (!schedule || schedule.length === 0) {
-        return null;
+export const ScheduleView: React.FC<ScheduleViewProps> = ({
+    schedule,
+    userRole,
+    onToggleLeave,
+    onAddReinforcement,
+    onRemoveReinforcement,
+    leaves,
+    committedLeaves,
+    showHistory = false,
+}) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const filteredSchedule = showHistory
+        ? schedule
+        : schedule.filter(day => {
+            const dayDate = new Date(day.date);
+            dayDate.setHours(0, 0, 0, 0);
+            return dayDate >= today;
+        });
+
+    if (filteredSchedule.length === 0) {
+        return <div className="text-gray-400 italic p-4">Bu ay için gösterilecek plan bulunamadı (Geçmiş gizlendi).</div>;
     }
 
     return (
         <div className="mt-8 animate-fade-in">
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                {schedule.map(day => (
+                {filteredSchedule.map((day, index) => (
                     <DayCard
-                        key={day.date.toISOString()}
+                        key={index}
                         day={day}
                         userRole={userRole}
                         onToggleLeave={onToggleLeave}

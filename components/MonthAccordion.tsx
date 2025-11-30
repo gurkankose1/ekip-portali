@@ -12,6 +12,7 @@ interface MonthAccordionProps {
     leaves: Map<string, Set<string>>;
     committedLeaves?: Map<string, Set<string>>;
     personnel: string[];
+    showHistory?: boolean;
 }
 
 export const MonthAccordion: React.FC<MonthAccordionProps> = ({
@@ -22,7 +23,8 @@ export const MonthAccordion: React.FC<MonthAccordionProps> = ({
     onRemoveReinforcement,
     leaves,
     committedLeaves,
-    personnel
+    personnel,
+    showHistory = false,
 }) => {
     const monthKeys = Array.from(monthsData.keys());
     const [activeMonthKey, setActiveMonthKey] = useState<string | null>(monthKeys.length > 0 ? monthKeys[0] : null);
@@ -31,9 +33,31 @@ export const MonthAccordion: React.FC<MonthAccordionProps> = ({
         setActiveMonthKey(activeKey => (activeKey === key ? null : key));
     };
 
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth(); // 0-indexed
+
+    const filteredMonthKeys = showHistory
+        ? monthKeys
+        : monthKeys.filter(key => {
+            // key format: "Kasım 2025"
+            const [monthName, yearStr] = key.split(' ');
+            const year = parseInt(yearStr);
+
+            const monthNames = [
+                'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+                'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
+            ];
+            const monthIndex = monthNames.indexOf(monthName);
+
+            if (year < currentYear) return false;
+            if (year === currentYear && monthIndex < currentMonth) return false;
+            return true;
+        });
+
     return (
         <div className="space-y-2 mt-8">
-            {monthKeys.map(monthKey => {
+            {filteredMonthKeys.map(monthKey => {
                 // FIX: Add a type guard to ensure monthKey is a string before using it, which resolves the TypeScript error.
                 if (typeof monthKey !== 'string') return null;
 
@@ -77,6 +101,7 @@ export const MonthAccordion: React.FC<MonthAccordionProps> = ({
                                     onRemoveReinforcement={onRemoveReinforcement}
                                     leaves={leaves}
                                     committedLeaves={committedLeaves}
+                                    showHistory={showHistory}
                                 />
                                 <SummaryView summary={data.summary} monthName={monthKey} personnel={personnel} />
                             </section>

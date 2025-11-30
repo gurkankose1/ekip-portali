@@ -310,13 +310,18 @@ const generateAndAssignSchedule = (
                     }
 
                     candidatePool.sort((a, b) => {
-                        // 1. Kriter: Bu istasyonda en az görev alan öne geçer (Adaletli Dağılım)
+                        // 1. Kriter: Toplam görev sayısı farkı çok açıksa (2 veya daha fazla), az olanı öne al (Catch-up)
+                        const totalDiff = (runningSummary[a]?.total || 0) - (runningSummary[b]?.total || 0);
+                        if (Math.abs(totalDiff) > 1) {
+                            return totalDiff;
+                        }
+
+                        // 2. Kriter: Bu istasyonda en az görev alan öne geçer (İstasyon Adaleti)
                         const stationCountA = runningSummary[a]?.stations[station] || 0;
                         const stationCountB = runningSummary[b]?.stations[station] || 0;
                         if (stationCountA !== stationCountB) return stationCountA - stationCountB;
 
-                        // 2. Kriter: Toplam görev sayısı en az olan öne geçer
-                        const totalDiff = (runningSummary[a]?.total || 0) - (runningSummary[b]?.total || 0);
+                        // 3. Kriter: Eşitlik durumunda toplam görev sayısı az olan öne geçer (İnce ayar)
                         return totalDiff;
                     });
 
@@ -712,6 +717,7 @@ const App: React.FC = () => {
 
     const [isReinforcementModalOpen, setIsReinforcementModalOpen] = useState(false);
     const [reinforcementModalDate, setReinforcementModalDate] = useState<Date | null>(null);
+    const [showHistory, setShowHistory] = useState(false);
     const [activeView, setActiveView] = useState<ActiveView>('portal');
 
     const processYearlySchedule = useMemo(() => (fullSchedule: DaySchedule[], personnel: string[]) => {
@@ -942,10 +948,21 @@ const App: React.FC = () => {
             case 'schedule':
                 return (
                     <div className="animate-fade-in">
-                        <header className="text-center mb-8">
+                        <header className="text-center mb-8 relative">
                             <p className="text-slate-400 mt-2 text-lg">
                                 Yıllık Görev ve İstasyon Dağılımı ({startMonthStr} - {endMonthStr})
                             </p>
+                            <div className="absolute right-0 top-0 mt-2 mr-2">
+                                <button
+                                    onClick={() => setShowHistory(!showHistory)}
+                                    className={`text-xs px-3 py-1.5 rounded-full font-medium transition-colors border ${showHistory
+                                        ? 'bg-slate-700 text-slate-300 border-slate-600 hover:bg-slate-600'
+                                        : 'bg-sky-900/30 text-sky-400 border-sky-800 hover:bg-sky-900/50'
+                                        }`}
+                                >
+                                    {showHistory ? 'Geçmişi Gizle' : 'Geçmişi Göster'}
+                                </button>
+                            </div>
                         </header>
 
                         <main>
@@ -1041,6 +1058,7 @@ const App: React.FC = () => {
                                     leaves={currentLeaves}
                                     committedLeaves={draftState.leaves}
                                     personnel={currentPersonnelList}
+                                    showHistory={showHistory}
                                 />
                             ) : (
                                 <div className="text-center p-8 text-slate-400">
