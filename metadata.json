@@ -1,0 +1,7 @@
+{
+  "name": "Ekip Portalı",
+  "description": "Personel listesi ve başlangıç tarihine göre otomatik vardiya ve istasyon ataması yapan bir uygulama. Vardiya döngüsü SABAH-SABAH-OFF-OFF-GECE-GECE-OFF-OFF şeklindedir.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

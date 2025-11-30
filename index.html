@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="tr" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ekip Portalı</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+      .react-grid-layout {
+        position: relative;
+        transition: height 200ms ease;
+      }
+      .react-grid-item {
+        transition: all 200ms ease;
+        transition-property: left, top;
+      }
+      .react-grid-item.cssTransforms {
+        transition-property: transform;
+      }
+      .react-grid-item.resizing {
+        z-index: 1;
+        will-change: width, height;
+      }
+      .react-grid-item.react-draggable-dragging {
+        transition: none;
+        z-index: 3;
+        will-change: transform;
+      }
+      .react-grid-item.react-grid-placeholder {
+        background: #0ea5e9;
+        opacity: 0.2;
+        transition-duration: 100ms;
+        z-index: 2;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        -o-user-select: none;
+        user-select: none;
+      }
+      .react-grid-item > .react-resizable-handle {
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        bottom: 0;
+        right: 0;
+        cursor: se-resize;
+      }
+      .react-grid-item > .react-resizable-handle::after {
+        content: "";
+        position: absolute;
+        right: 3px;
+        bottom: 3px;
+        width: 5px;
+        height: 5px;
+        border-right: 2px solid rgba(255, 255, 255, 0.4);
+        border-bottom: 2px solid rgba(255, 255, 255, 0.4);
+      }
+      /* Spreadsheet Styles */
+      .spreadsheet-selection-area {
+        background-color: rgba(14, 165, 233, 0.2); /* sky-500 with opacity */
+      }
+      .col-resizer, .row-resizer {
+        position: absolute;
+        z-index: 10;
+      }
+      .col-resizer {
+        top: 0;
+        right: -2px;
+        width: 4px;
+        height: 100%;
+        cursor: col-resize;
+      }
+      .row-resizer {
+        left: 0;
+        bottom: -2px;
+        width: 100%;
+        height: 4px;
+        cursor: row-resize;
+      }
+      body.resizing-col, body.resizing-col * {
+        cursor: col-resize !important;
+        user-select: none;
+      }
+      body.resizing-row, body.resizing-row * {
+        cursor: row-resize !important;
+        user-select: none;
+      }
+      
+      /* --- THEME OVERRIDES --- */
+      /* --- Light Theme --- */
+      html.light .bg-slate-900 { background-color: #f8fafc; } /* slate-50 */
+      html.light .text-slate-100 { color: #0f172a; } /* slate-900 */
+      html.light body { background-color: #f8fafc; color: #0f172a; }
+      html.light .bg-slate-800 { background-color: #ffffff; } /* white */
+      html.light .bg-slate-800\/90 { background-color: rgba(255,255,255,0.9); }
+      html.light .bg-slate-800\/80 { background-color: rgba(255,255,255,0.8); }
+      html.light .bg-slate-700 { background-color: #e2e8f0; } /* slate-200 */
+      html.light .bg-slate-700\/50 { background-color: rgba(226, 232, 240, 0.5); }
+      html.light .bg-slate-600 { background-color: #cbd5e1; } /* slate-300 */
+      html.light .bg-slate-500 { background-color: #94a3b8; } /* slate-400 */
+      html.light .hover\:bg-slate-700\/50:hover { background-color: rgba(203, 213, 225, 0.5); }
+      html.light .hover\:bg-slate-700:hover { background-color: #cbd5e1; }
+      html.light .hover\:bg-slate-600:hover { background-color: #94a3b8; } /* slate-400 */
+      html.light .hover\:bg-slate-500:hover { background-color: #94a3b8; }
+      html.light .text-slate-200 { color: #1e293b; } /* slate-800 */
+      html.light .text-slate-300 { color: #334155; } /* slate-700 */
+      html.light .text-slate-400 { color: #475569; } /* slate-600 */
+      html.light .text-slate-500 { color: #64748b; } /* slate-500 */
+      html.light .border-slate-700 { border-color: #e2e8f0; } /* slate-200 */
+      html.light .border-slate-600 { border-color: #cbd5e1; } /* slate-300 */
+      html.light .text-sky-300 { color: #0c4a6e; } /* sky-900 */
+      html.light .text-sky-400 { color: #075985; } /* sky-800 */
+      html.light .bg-sky-900\/50 { background-color: rgba(224, 242, 254, 0.5); } /* sky-100/50 */
+      html.light .bg-sky-800 { background-color: #38bdf8; } /* sky-400 */
+      html.light .hover\:bg-sky-700:hover { background-color: #0ea5e9; } /* sky-500 */
+      html.light .bg-sky-600 { background-color: #0ea5e9; } /* sky-500 */
+      html.light .bg-sky-500 { background-color: #0ea5e9; } /* sky-500 */
+      html.light .hover\:bg-sky-500:hover { background-color: #0284c7; } /* sky-600 */
+      html.light .focus\:ring-sky-500:focus { --tw-ring-color: #0ea5e9; }
+      html.light .text-amber-400 { color: #d97706; } /* amber-600 */
+      html.light .text-indigo-400 { color: #4338ca; } /* indigo-700 */
+      html.light .bg-emerald-900\/80 { background-color: rgba(209, 250, 229, 0.8); } /* emerald-100/80 */
+      html.light .text-emerald-300 { color: #047857; } /* emerald-700 */
+      html.light .bg-emerald-800 { background-color: #34d399; } /* emerald-400 */
+      html.light .hover\:bg-emerald-700:hover { background-color: #10b981; } /* emerald-500 */
+      html.light .bg-emerald-700 { background-color: #10b981; } /* emerald-500 */
+      html.light .bg-emerald-500 { background-color: #10b981; } /* emerald-500 */
+      html.light .hover\:bg-emerald-600:hover { background-color: #059669; } /* emerald-600 */
+      html.light .bg-red-800 { background-color: #ef4444; } /* red-500 */
+      html.light .hover\:bg-red-700:hover { background-color: #dc2626; } /* red-600 */
+      html.light .text-red-400 { color: #dc2626; } /* red-600 */
+      html.light .hover\:text-red-300:hover { color: #b91c1c; } /* red-700 */
+      html.light .hover\:bg-red-500:hover { background-color: #dc2626; } /* red-600 */
+      html.light .bg-indigo-700 { background-color: #4f46e5; } /* indigo-600 */
+      html.light .bg-indigo-500 { background-color: #6366f1; }
+      html.light .hover\:bg-indigo-600:hover { background-color: #4338ca; } /* indigo-700 */
+      html.light .bg-cyan-400 { background-color: #22d3ee; }
+      html.light .bg-purple-500 { background-color: #a855f7; }
+      html.light .bg-pink-500 { background-color: #ec4899; }
+      html.light .spreadsheet-selection-area { background-color: rgba(56, 189, 248, 0.2); } /* sky-400/20 */
+      html.light .react-grid-placeholder { background: #38bdf8; }
+      html.light .react-grid-item > .react-resizable-handle::after { border-color: rgba(0, 0, 0, 0.4); }
+      
+      /* --- Blue Theme --- */
+      html.blue body { background-color: hsl(215 50% 12%); color: #d1d5db; }
+      html.blue .bg-slate-900 { background-color: hsl(215 50% 12%); }
+      html.blue .text-slate-100 { color: #e5e7eb; } /* gray-200 */
+      html.blue .bg-slate-800 { background-color: hsl(215 45% 18%); }
+      html.blue .bg-slate-800\/90 { background-color: hsla(215, 45%, 18%, 0.9); }
+      html.blue .bg-slate-800\/80 { background-color: hsla(215, 45%, 18%, 0.8); }
+      html.blue .bg-slate-700 { background-color: hsl(215 40% 25%); }
+      html.blue .bg-slate-700\/50 { background-color: hsla(215, 40%, 25%, 0.5); }
+      html.blue .bg-slate-600 { background-color: hsl(215 35% 35%); }
+      html.blue .bg-slate-500 { background-color: hsl(215 30% 45%); }
+      html.blue .hover\:bg-slate-700\/50:hover { background-color: hsla(215, 35%, 35%, 0.5); }
+      html.blue .hover\:bg-slate-700:hover { background-color: hsl(215 35% 35%); }
+      html.blue .hover\:bg-slate-600:hover { background-color: hsl(215 30% 45%); }
+      html.blue .hover\:bg-slate-500:hover { background-color: hsl(215 30% 45%); }
+      html.blue .text-slate-300 { color: #9ca3af; } /* gray-400 */
+      html.blue .text-slate-400 { color: #6b7280; } /* gray-500 */
+      html.blue .text-slate-500 { color: #4b5563; } /* gray-600 */
+      html.blue .border-slate-700 { border-color: hsl(215 35% 35%); }
+      html.blue .border-slate-600 { border-color: hsl(215 25% 45%); }
+      html.blue .text-sky-300 { color: #60a5fa; } /* blue-400 */
+      html.blue .text-sky-400 { color: #3b82f6; } /* blue-500 */
+      html.blue .bg-sky-900\/50 { background-color: rgba(30, 58, 138, 0.5); } /* blue-900/50 */
+      html.blue .bg-sky-800 { background-color: #1d4ed8; } /* blue-700 */
+      html.blue .hover\:bg-sky-700:hover { background-color: #1e40af; } /* blue-800 */
+      html.blue .bg-sky-600 { background-color: #2563eb; } /* blue-600 */
+      html.blue .bg-sky-500 { background-color: #3b82f6; } /* blue-500 */
+      html.blue .hover\:bg-sky-500:hover { background-color: #1d4ed8; } /* blue-700 */
+      html.blue .focus\:ring-sky-500:focus { --tw-ring-color: #2563eb; }
+      html.blue .text-amber-400 { color: #fbbf24; } /* amber-400 */
+      html.blue .text-indigo-400 { color: #818cf8; } /* indigo-400 */
+      html.blue .bg-emerald-900\/80 { background-color: rgba(4, 120, 87, 0.3); } /* emerald-700/30 */
+      html.blue .text-emerald-300 { color: #6ee7b7; } /* emerald-300 */
+      html.blue .bg-emerald-800 { background-color: #059669; } /* emerald-600 */
+      html.blue .hover\:bg-emerald-700:hover { background-color: #047857; } /* emerald-700 */
+      html.blue .bg-emerald-700 { background-color: #047857; } /* emerald-700 */
+      html.blue .bg-emerald-500 { background-color: #10b981; }
+      html.blue .hover\:bg-emerald-600:hover { background-color: #065f46; } /* emerald-800 */
+      html.blue .bg-red-800 { background-color: #b91c1c; } /* red-700 */
+      html.blue .hover\:bg-red-700:hover { background-color: #991b1b; } /* red-800 */
+      html.blue .text-red-400 { color: #f87171; } /* red-400 */
+      html.blue .hover\:text-red-300:hover { color: #ef4444; } /* red-500 */
+      html.blue .hover\:bg-red-500:hover { background-color: #b91c1c; } /* red-700 */
+      html.blue .bg-indigo-700 { background-color: #4338ca; } /* indigo-700 */
+      html.blue .bg-indigo-500 { background-color: #6366f1; }
+      html.blue .hover\:bg-indigo-600:hover { background-color: #3730a3; } /* indigo-800 */
+      html.blue .bg-cyan-400 { background-color: #22d3ee; }
+      html.blue .bg-purple-500 { background-color: #a855f7; }
+      html.blue .bg-pink-500 { background-color: #ec4899; }
+      html.blue .spreadsheet-selection-area { background-color: rgba(59, 130, 246, 0.2); } /* blue-500/20 */
+      html.blue .react-grid-placeholder { background: #2563eb; }
+
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "firebase/": "https://aistudiocdn.com/firebase@^12.4.0/",
+    "react-grid-layout": "https://aistudiocdn.com/react-grid-layout@^1.5.2",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.27.0",
+    "vite": "https://aistudiocdn.com/vite@^7.1.12",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-slate-900 text-slate-100">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
