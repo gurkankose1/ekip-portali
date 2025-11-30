@@ -227,14 +227,16 @@ const generateAndAssignSchedule = (
                         candidatePool = [...assignablePersonnel];
                     }
 
-                    // 1. Kriter: Bu istasyonda en az görev alan öne geçer (Adaletli Dağılım)
-                    const stationCountA = runningSummary[a]?.stations[station] || 0;
-                    const stationCountB = runningSummary[b]?.stations[station] || 0;
-                    if (stationCountA !== stationCountB) return stationCountA - stationCountB;
+                    candidatePool.sort((a, b) => {
+                        // 1. Kriter: Bu istasyonda en az görev alan öne geçer (Adaletli Dağılım)
+                        const stationCountA = runningSummary[a]?.stations[station] || 0;
+                        const stationCountB = runningSummary[b]?.stations[station] || 0;
+                        if (stationCountA !== stationCountB) return stationCountA - stationCountB;
 
-                    // 2. Kriter: Toplam görev sayısı en az olan öne geçer
-                    const totalDiff = (runningSummary[a]?.total || 0) - (runningSummary[b]?.total || 0);
-                    return totalDiff;
+                        // 2. Kriter: Toplam görev sayısı en az olan öne geçer
+                        const totalDiff = (runningSummary[a]?.total || 0) - (runningSummary[b]?.total || 0);
+                        return totalDiff;
+                    });
 
                     const personToAssign = candidatePool[0];
 
