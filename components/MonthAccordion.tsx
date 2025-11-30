@@ -4,22 +4,24 @@ import { ScheduleView } from './ScheduleView.tsx';
 import { SummaryView } from './SummaryView.tsx';
 
 interface MonthAccordionProps {
-  monthsData: Map<string, { schedule: DaySchedule[], summary: SummaryData }>;
-  userRole: UserRole;
-  onToggleLeave: (date: Date, personnel: string) => void;
-  onAddReinforcement: (date: Date) => void;
-  onRemoveReinforcement: (date: Date, personnel: string) => void;
-  leaves: Map<string, Set<string>>;
-  personnel: string[];
+    monthsData: Map<string, { schedule: DaySchedule[], summary: SummaryData }>;
+    userRole: UserRole;
+    onToggleLeave: (date: Date, personnel: string) => void;
+    onAddReinforcement: (date: Date) => void;
+    onRemoveReinforcement: (date: Date, personnel: string) => void;
+    leaves: Map<string, Set<string>>;
+    committedLeaves?: Map<string, Set<string>>;
+    personnel: string[];
 }
 
-export const MonthAccordion: React.FC<MonthAccordionProps> = ({ 
-    monthsData, 
-    userRole, 
-    onToggleLeave, 
-    onAddReinforcement, 
+export const MonthAccordion: React.FC<MonthAccordionProps> = ({
+    monthsData,
+    userRole,
+    onToggleLeave,
+    onAddReinforcement,
     onRemoveReinforcement,
     leaves,
+    committedLeaves,
     personnel
 }) => {
     const monthKeys = Array.from(monthsData.keys());
@@ -67,13 +69,14 @@ export const MonthAccordion: React.FC<MonthAccordionProps> = ({
                                 aria-labelledby={`month-header-${monthKey}`}
                                 className="p-4 bg-slate-800/50 animate-fade-in"
                             >
-                                <ScheduleView 
-                                    schedule={data.schedule} 
+                                <ScheduleView
+                                    schedule={data.schedule}
                                     userRole={userRole}
-                                    onToggleLeave={onToggleLeave} 
+                                    onToggleLeave={onToggleLeave}
                                     onAddReinforcement={onAddReinforcement}
                                     onRemoveReinforcement={onRemoveReinforcement}
                                     leaves={leaves}
+                                    committedLeaves={committedLeaves}
                                 />
                                 <SummaryView summary={data.summary} monthName={monthKey} personnel={personnel} />
                             </section>
