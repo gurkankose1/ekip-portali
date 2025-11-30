@@ -1,6 +1,6 @@
 import { ShiftType } from './types.ts';
 
-export const SHIFT_CYCLE: ShiftType[] = ['SABAH', 'SABAH', 'OFF', 'OFF', 'GECE', 'GECE', 'OFF', 'OFF'];
+export const SHIFT_CYCLE: ShiftType[] = ['OFF', 'OFF', 'SABAH', 'SABAH', 'OFF', 'OFF', 'GECE', 'GECE'];
 export const STATIONS: string[] = [
   'Planlama',
   'Frekans',
