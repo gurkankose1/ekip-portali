@@ -461,6 +461,15 @@ const App: React.FC = () => {
                     // Current user was deleted from DB, so log out
                     handleLogout();
                 }
+            } else {
+                // Try to restore session
+                const storedUserId = localStorage.getItem('currentUserId') || sessionStorage.getItem('currentUserId');
+                if (storedUserId) {
+                    const storedUser = loadedUsers.find(u => u.id === storedUserId);
+                    if (storedUser) {
+                        setCurrentUser(storedUser);
+                    }
+                }
             }
         });
         return () => unsubscribe();
@@ -526,7 +535,7 @@ const App: React.FC = () => {
 
         if (user && user.password_insecure === password_insecure) {
             setCurrentUser(user);
-            sessionStorage.setItem('currentUserId', user.id);
+            localStorage.setItem('currentUserId', user.id);
         } else {
             setLoginError('Geçersiz kullanıcı adı veya şifre.');
         }
@@ -534,6 +543,7 @@ const App: React.FC = () => {
 
     const handleLogout = () => {
         setCurrentUser(null);
+        localStorage.removeItem('currentUserId');
         sessionStorage.removeItem('currentUserId');
         setActiveView('portal');
     };
