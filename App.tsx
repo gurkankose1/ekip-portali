@@ -288,15 +288,18 @@ const generateAndAssignSchedule = (
                             const criticalCountB = (runningSummary[b]?.stations['Planlama'] || 0) + (runningSummary[b]?.stations['Frekans'] || 0) + (runningSummary[b]?.stations['Su Anons'] || 0);
                             if (criticalCountA !== criticalCountB) return criticalCountA - criticalCountB;
                         } else {
-                            // Boardlar için: Toplam Board Görev Sayısı (B1+B2+B3+B4) en az olan öne geçer.
-                            const boardCountA = (runningSummary[a]?.stations['Board1'] || 0) + (runningSummary[a]?.stations['Board2'] || 0) + (runningSummary[a]?.stations['Board3'] || 0) + (runningSummary[a]?.stations['Board4'] || 0);
-                            const boardCountB = (runningSummary[b]?.stations['Board1'] || 0) + (runningSummary[b]?.stations['Board2'] || 0) + (runningSummary[b]?.stations['Board3'] || 0) + (runningSummary[b]?.stations['Board4'] || 0);
-                            if (boardCountA !== boardCountB) return boardCountA - boardCountB;
+                            // Boardlar için:
 
-                            // Eşitse, bu spesifik boarddaki sayısı en az olan
+                            // 1. ÖNCELİK: Bu spesifik boarddaki görev sayısı (Eşitlik İlkesi)
                             const stationCountA = runningSummary[a]?.stations[station] || 0;
                             const stationCountB = runningSummary[b]?.stations[station] || 0;
                             if (stationCountA !== stationCountB) return stationCountA - stationCountB;
+
+                            // 2. ÖNCELİK: Toplam Board Görev Sayısı (B1+B2+B3+B4) en az olan öne geçer.
+                            const boardCountA = (runningSummary[a]?.stations['Board1'] || 0) + (runningSummary[a]?.stations['Board2'] || 0) + (runningSummary[a]?.stations['Board3'] || 0) + (runningSummary[a]?.stations['Board4'] || 0);
+                            const boardCountB = (runningSummary[b]?.stations['Board1'] || 0) + (runningSummary[b]?.stations['Board2'] || 0) + (runningSummary[b]?.stations['Board3'] || 0) + (runningSummary[b]?.stations['Board4'] || 0);
+
+                            if (boardCountA !== boardCountB) return boardCountA - boardCountB;
                         }
 
                         // Son çare: Toplam görev sayısı
